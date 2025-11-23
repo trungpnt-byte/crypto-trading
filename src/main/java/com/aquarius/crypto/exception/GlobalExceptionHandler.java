@@ -36,23 +36,24 @@ public class GlobalExceptionHandler {
                 .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.BAD_REQUEST.value())));
     }
 
-//    @ExceptionHandler(PriceNotFoundException.class)
-//    public Mono<ResponseEntity<ApiResponse<Void>>> handlePriceNotFoundException(
-//            PriceNotFoundException ex) {
-//        log.error("Price not found: {}", ex.getMessage());
-//        return Mono.just(ResponseEntity
-//                .status(HttpStatus.NOT_FOUND)
-//                .body(ApiResponse.error(ex.getMessage())));
-//    }
-//
-//    @ExceptionHandler(TradingException.class)
-//    public Mono<ResponseEntity<ApiResponse<Void>>> handleTradingException(
-//            TradingException ex) {
-//        log.error("Trading error: {}", ex.getMessage(), ex);
-//        return Mono.just(ResponseEntity
-//                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                .body(ApiResponse.error("Trading operation failed: " + ex.getMessage())));
-//    }
+    @ExceptionHandler(PriceNotFoundException.class)
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handlePriceNotFoundException(
+            PriceNotFoundException ex) {
+        log.error("Price not found: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.NOT_FOUND.value())));
+    }
+
+    @ExceptionHandler(TradingException.class)
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleTradingException(
+            TradingException ex) {
+        log.error("Trading error: {}", ex.getMessage(), ex);
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(LocalApiResponse.error("Trading operation failed: " + ex.getMessage(),
+                        HttpStatus.INTERNAL_SERVER_ERROR.value())));
+    }
 
     @ExceptionHandler(WebExchangeBindException.class)
     public Mono<ResponseEntity<LocalApiResponse<Map<String, String>>>> handleValidationException(

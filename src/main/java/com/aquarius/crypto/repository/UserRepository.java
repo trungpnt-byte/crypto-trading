@@ -1,18 +1,19 @@
 package com.aquarius.crypto.repository;
 
-import com.aquarius.crypto.model.User;;
-import org.springframework.data.repository.PagingAndSortingRepository;;
+import com.aquarius.crypto.model.User;
+import org.springframework.data.r2dbc.repository.R2dbcRepository;
+;
 import org.springframework.stereotype.Repository;
-
-import java.util.List;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Repository
-public interface UserRepository extends PagingAndSortingRepository<User, Long> {
-    List<User> findAll();
+public interface UserRepository extends R2dbcRepository<User, Long> {
+    Mono<User> findByUsername(String username);
 
-    User findByUsername(String userName);
+    Mono<User> save(User user);
 
-    User findByEmail(String email);
+    Mono<User> findByEmail(String email);
 
-    User save(User user);
+    Flux<User> findAll();
 }

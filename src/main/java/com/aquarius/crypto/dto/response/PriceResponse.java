@@ -12,13 +12,10 @@ import java.time.Instant;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class TradeResponse {
-    private Long transactionId;
+public class PriceResponse {
     private String tradingPair;
-    private String tradeType;
-    private BigDecimal quantity;
-    private BigDecimal price;
-    private BigDecimal totalAmount;
-    private String status;
+    private BigDecimal bidPrice;
+    private BigDecimal askPrice;
+    private String source;
     private Instant timestamp;
 }
