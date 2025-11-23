@@ -1,0 +1,27 @@
+services:
+  trading-service:
+    build: .
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - trading-network
+
+  db:
+    image: 'postgres:latest'
+    container_name: trading-db
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=trading-db
+      - POSTGRES_USER=trading-postgres
+      - POSTGRES_PASSWORD=admin123
+    volumes:
+      - db-data:/var/lib/postgresql
+    networks:
+      - trading-network
+volumes:
+  db-data:
+networks:
+  trading-network:
