@@ -1,10 +1,10 @@
 package com.aquarius.crypto.controller;
 
 import com.aquarius.crypto.common.LocalApiResponse;
-import com.aquarius.crypto.dto.response.PriceResponse;
+import com.aquarius.crypto.dto.response.AggregatedPriceResponse;
 import com.aquarius.crypto.service.PriceAggregationService;
 import lombok.RequiredArgsConstructor;
-import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
@@ -17,13 +17,24 @@ public class PriceController {
     private final PriceAggregationService priceService;
 
     @GetMapping("/{tradingPair}")
-    public Mono<ResponseEntity<LocalApiResponse<PriceResponse>>> getLatestPrice(
+    public Mono<ResponseEntity<LocalApiResponse<AggregatedPriceResponse>>> getLatestPrice(
             @PathVariable String tradingPair) {
 
-        return priceService.getLatestPrice(tradingPair.toUpperCase())
-                .map(price -> ResponseEntity.ok(LocalApiResponse.success(price,
-                        "Price retrieved successfully",
-                        200)));
-
+        return priceService.findByTradingPair(tradingPair)
+                .map(aggregatedPriceResponse -> ResponseEntity.ok(
+                        LocalApiResponse.success(
+                                aggregatedPriceResponse,
+                                "Price retrieved successfully",
+                                HttpStatus.OK.value()
+                        )
+                ))
+                .defaultIfEmpty(
+                        ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+                                LocalApiResponse.error(
+                                        "Price not found for trading pair " + tradingPair,
+                                        HttpStatus.NOT_FOUND.value()
+                                )
+                        )
+                );
     }
 }

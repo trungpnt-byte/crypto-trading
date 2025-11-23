@@ -20,7 +20,7 @@ import java.time.Instant;
 public class PriceAggregation {
     @Id
     private Long id;
-    private String tradingPair;
+    private String tradingPair; // e.g., "ETHUSDT"
     private BigDecimal bestBidPrice;
     private BigDecimal bestAskPrice;
     private String source;

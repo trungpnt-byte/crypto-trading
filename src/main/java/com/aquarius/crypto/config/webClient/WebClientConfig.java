@@ -22,6 +22,11 @@ public class WebClientConfig {
     private static final int RETRY_COUNT = 1;
     private static final Duration RETRY_MIN_BACKOFF = Duration.ofSeconds(2);
 
+    @Bean("tickerWebClient")
+    public WebClient webClient() {
+        return webClientBuilder().build();
+    }
+
     @Bean
     public WebClient.Builder webClientBuilder() {
         HttpClient httpClient = HttpClient.create()

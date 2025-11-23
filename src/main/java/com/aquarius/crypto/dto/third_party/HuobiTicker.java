@@ -1,15 +1,27 @@
 package com.aquarius.crypto.dto.third_party;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
-@Getter
+@NoArgsConstructor
+@AllArgsConstructor
 public class HuobiTicker {
-    private String symbol;
+    private String symbol; // e.g., ethusdt (lowercase)
     private BigDecimal bid;
     private BigDecimal ask;
-}
 
+    public TickerResponse toTickerResponse(String source) {
+        String standardizedSymbol = this.symbol.toUpperCase();
+
+        return new TickerResponse(
+                standardizedSymbol,
+                this.bid,
+                this.ask,
+                source
+        );
+    }
+}

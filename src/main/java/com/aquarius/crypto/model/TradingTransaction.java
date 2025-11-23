@@ -1,5 +1,6 @@
 package com.aquarius.crypto.model;
 
+import com.aquarius.crypto.dto.TradeType;
 import org.springframework.data.relational.core.mapping.Table;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
@@ -22,10 +23,10 @@ public class TradingTransaction {
     private Long id;
     private Long userId;
     private String tradingPair;
-    private String tradeType; // BUY or SELL
+    private TradeType tradeType; // BUY or SELL
     private BigDecimal quantity;
-    private BigDecimal price;
-    private BigDecimal totalAmount;
+    private BigDecimal price; // price per unit of base currency at which the trade was executed
+    private BigDecimal totalAmount; // how much crypto was spent/received in the trade
     private String status; // COMPLETED, FAILED
     private Instant createdAt;
 }

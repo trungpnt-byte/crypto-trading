@@ -1,12 +1,15 @@
-package com.aquarius.crypto.service;
+package com.aquarius.crypto.service.trading_transaction;
 
-import com.aquarius.crypto.dto.request.TradeRequest;
+import com.aquarius.crypto.dto.TradeType;
+import com.aquarius.crypto.dto.request.TradingRequest;
 import com.aquarius.crypto.model.PriceAggregation;
 import com.aquarius.crypto.model.TradingTransaction;
 import com.aquarius.crypto.model.Wallet;
 import com.aquarius.crypto.repository.PriceAggregationRepository;
 import com.aquarius.crypto.repository.TradingTransactionRepository;
 import com.aquarius.crypto.repository.WalletRepository;
+import com.aquarius.crypto.service.PriceAggregationService;
+import com.aquarius.crypto.service.TradingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +21,6 @@ import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -35,11 +37,14 @@ class TradingServiceTest {
     @Mock
     private PriceAggregationRepository priceRepository;
 
+    @Mock
+    private PriceAggregationService priceAggregationService;
+
     @InjectMocks
     private TradingService tradingService;
 
     private Long userId;
-    private TradeRequest buyRequest;
+    private TradingRequest buyRequest;
     private PriceAggregation priceAggregation;
     private Wallet usdtWallet;
     private Wallet ethWallet;
@@ -48,9 +53,10 @@ class TradingServiceTest {
     void setUp() {
         userId = 1L;
 
-        buyRequest = TradeRequest.builder()
+        buyRequest = TradingRequest.builder()
                 .tradingPair("ETHUSDT")
                 .tradeType("BUY")
+                .symbol("ETHUSDT")
                 .quantity(new BigDecimal("1.0"))
                 .build();
 
@@ -93,7 +99,7 @@ class TradingServiceTest {
                 .id(1L)
                 .userId(userId)
                 .tradingPair("ETHUSDT")
-                .tradeType("BUY")
+                .tradeType(TradeType.valueOf("BUY"))
                 .quantity(new BigDecimal("1.0"))
                 .price(new BigDecimal("2001.00"))
                 .totalAmount(new BigDecimal("2001.00"))
@@ -104,13 +110,12 @@ class TradingServiceTest {
         when(transactionRepository.save(any(TradingTransaction.class)))
                 .thenReturn(Mono.just(savedTransaction));
 
-        StepVerifier.create(tradingService.executeTrade(userId, buyRequest))
+        StepVerifier.create(tradingService.executeTrade(buyRequest))
                 .expectNextMatches(response ->
-                        response.getTransactionId().equals(1L) &&
+                        response.getId().equals(1L) &&
                                 response.getTradeType().equals("BUY") &&
                                 response.getStatus().equals("COMPLETED")
-                )
-                .verifyComplete();
+                ).verifyComplete();
 
         verify(walletRepository, times(2)).save(any(Wallet.class));
         verify(transactionRepository, times(1)).save(any(TradingTransaction.class));

@@ -1,19 +1,25 @@
 package com.aquarius.crypto.dto.third_party;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.AllArgsConstructor;
 import lombok.Data;
-import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 
 @Data
-@Getter
+@NoArgsConstructor
+@AllArgsConstructor
 public class BinanceTickerResponse {
     private String symbol;
+    private String bidPrice;
+    private String askPrice;
 
-    @JsonProperty("bidPrice")
-    private BigDecimal bidPrice;
-
-    @JsonProperty("askPrice")
-    private BigDecimal askPrice;
+    public TickerResponse toTickerResponse(String source) {
+        return new TickerResponse(
+                this.symbol,
+                new BigDecimal(this.bidPrice),
+                new BigDecimal(this.askPrice),
+                source
+        );
+    }
 }

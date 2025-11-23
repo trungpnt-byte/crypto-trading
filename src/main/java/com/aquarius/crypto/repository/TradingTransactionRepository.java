@@ -11,4 +11,6 @@ public interface TradingTransactionRepository extends R2dbcRepository<TradingTra
     Flux<TradingTransaction> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     Mono<TradingTransaction> save(TradingTransaction any);
+
+    Flux<TradingTransaction> findByUserId(Long userId);
 }
