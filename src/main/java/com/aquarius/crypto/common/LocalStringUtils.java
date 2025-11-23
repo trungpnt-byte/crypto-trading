@@ -6,7 +6,7 @@ public class LocalStringUtils {
 
     /**
      * Strips characters from the start of the string until the predicate returns true.
-     * example:
+     * example : stripUntil("Bearer abcdef", Character::isWhitespace) -> "abcdef"
      *
      * @param str
      * @param predicate

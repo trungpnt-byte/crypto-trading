@@ -1,6 +1,7 @@
 package com.aquarius.crypto.config.security;
 
 
+import com.aquarius.crypto.common.ExtractionHelper;
 import com.aquarius.crypto.service.JwtService;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
@@ -31,7 +32,7 @@ public class JwtAuthenticationWebFilter implements WebFilter {
             return chain.filter(exchange);
         }
 
-        final String jwtToken = authHeader.substring(7);
+        final String jwtToken = ExtractionHelper.extractTokenValue(authHeader);
 
         return Mono.defer(() -> {
             String userEmail = jwtService.extractUsername(jwtToken);

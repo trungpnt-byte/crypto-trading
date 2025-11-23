@@ -27,11 +27,12 @@ public class PriceAggregationService {
     private static final String BINANCE_API = "https://api.binance.com/api/v3/ticker/bookTicker";
     private static final String HUOBI_API = "https://api.huobi.pro/market/tickers";
     private final PriceAggregationRepository priceRepository;
-    private WebClient.Builder webClientBuilder;
+    private final WebClient.Builder webClientBuilder;
 
     @Autowired
-    public PriceAggregationService(PriceAggregationRepository priceRepository) {
+    public PriceAggregationService(PriceAggregationRepository priceRepository, WebClient.Builder webClientBuilder) {
         this.priceRepository = priceRepository;
+        this.webClientBuilder = webClientBuilder;
     }
 
 
@@ -39,9 +40,7 @@ public class PriceAggregationService {
     public void aggregatePrices() {
         log.info("Starting price aggregation...");
 
-        TRADING_PAIRS.forEach(pair -> Mono.zip(fetchBinancePrice(pair), fetchHuobiPrice(pair)
-                )
-                .flatMap(tuple -> {
+        TRADING_PAIRS.forEach(pair -> Mono.zip(fetchBinancePrice(pair), fetchHuobiPrice(pair)).flatMap(tuple -> {
                     BinanceTickerResponse binance = tuple.getT1();
                     HuobiTicker huobi = tuple.getT2();
 
