@@ -8,6 +8,6 @@ import org.springframework.stereotype.Component;
 public class SecurityDomain {
     public String getTenantIdFromJwt(HttpServletRequest req) {
         //TODO implement AAA
-        return TenantContext.REVIT_TENANT_ID;
+        return TenantContext.TRADER_TENANT_ID;
     }
 }

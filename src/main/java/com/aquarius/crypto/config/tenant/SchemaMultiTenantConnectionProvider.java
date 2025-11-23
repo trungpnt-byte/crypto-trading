@@ -18,6 +18,7 @@ import java.util.Properties;
 @SuppressWarnings("serial")
 public class SchemaMultiTenantConnectionProvider extends AbstractMultiTenantConnectionProvider<String> {
 
+    private static final String HIBERNATE_PROPERTIES_PATH = "/application-dev.properties";
     private final Map<String, ConnectionProvider> connectionProviderMap = new HashMap<>();
 
     @Override
@@ -83,6 +84,4 @@ public class SchemaMultiTenantConnectionProvider extends AbstractMultiTenantConn
         provider.configure(map);
         return provider;
     }
-
-    private static final String HIBERNATE_PROPERTIES_PATH = "/application.properties";
 }
