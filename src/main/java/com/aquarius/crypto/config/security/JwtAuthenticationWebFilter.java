@@ -1,71 +1,62 @@
 package com.aquarius.crypto.config.security;
 
-import com.aquarius.crypto.common.ExtractionHelper;
-import com.aquarius.crypto.dao.UserDao;
+
 import com.aquarius.crypto.service.JwtService;
-import jakarta.servlet.FilterChain;
-import jakarta.servlet.ServletException;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.context.ReactiveSecurityContextHolder;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.OncePerRequestFilter;
-
-import java.io.IOException;
-
-import static com.aquarius.crypto.constants.StringContants.BEARER;
-import static org.springframework.http.HttpHeaders.AUTHORIZATION;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Mono;
 
 @Component
-@RequiredArgsConstructor
-public class JwtAuthenticationWebFilter extends OncePerRequestFilter {
+public class JwtAuthenticationWebFilter implements WebFilter {
 
-    private static final String ACCESS_COOKIE = "access_token";
+    private final ReactiveUserDetailsService userDetailsService;
+    private final JwtService jwtService;
 
-    private final UserDao userDao;
-
-    private final JwtService jwtUtils;
+    public JwtAuthenticationWebFilter(ReactiveUserDetailsService userDetailsService, JwtService jwtService) {
+        this.userDetailsService = userDetailsService;
+        this.jwtService = jwtService;
+    }
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
-        final String authHeader = request.getHeader(AUTHORIZATION);
-        final String userEmail;
-        final String jwtToken;
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
 
-        if (authHeader == null || !authHeader.startsWith(BEARER)) {
-            filterChain.doFilter(request, response);
-            return;
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return chain.filter(exchange);
         }
 
-        try {
-            jwtToken = ExtractionHelper.extractTokenValue(authHeader);
-            userEmail = jwtUtils.extractUsername(jwtToken);
+        final String jwtToken = authHeader.substring(7);
 
-            if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDao.findUserByEmail(userEmail);
+        return Mono.defer(() -> {
+            String userEmail = jwtService.extractUsername(jwtToken);
 
-                if (jwtUtils.validateToken(jwtToken, userDetails)) {
-                    UsernamePasswordAuthenticationToken authenticationToken =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
-                }
+            if (userEmail == null) {
+                return chain.filter(exchange);
             }
-            filterChain.doFilter(request, response);
-        } catch (Exception e) {
-            throw new ServletException(e);
-        }
+
+            return userDetailsService.findByUsername(userEmail)
+                    .filter(userDetails -> jwtService.validateToken(jwtToken, userDetails))
+                    .map(userDetails -> createAuthenticationToken(userDetails, exchange))
+                    .flatMap(authentication ->
+                            chain.filter(exchange)
+                                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
+                    ).switchIfEmpty(chain.filter(exchange));
+        });
+    }
+
+    private UsernamePasswordAuthenticationToken createAuthenticationToken(
+            UserDetails userDetails, ServerWebExchange exchange) {
+
+        return new UsernamePasswordAuthenticationToken(
+                userDetails,
+                null,
+                userDetails.getAuthorities()
+        );
     }
 }

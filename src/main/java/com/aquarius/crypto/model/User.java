@@ -1,9 +1,12 @@
 package com.aquarius.crypto.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.*;
+import org.springframework.data.relational.core.mapping.Table;
+import lombok.Builder;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.Setter;
+import org.springframework.data.annotation.Id;
 
 import java.time.Instant;
 
@@ -13,7 +16,6 @@ import java.time.Instant;
 @Getter
 @Setter
 @Table(name = "users")
-@Entity
 public class User {
     @Id
     private Long id;

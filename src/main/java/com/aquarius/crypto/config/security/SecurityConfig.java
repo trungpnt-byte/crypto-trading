@@ -1,70 +1,58 @@
 package com.aquarius.crypto.config.security;
 
-import com.aquarius.crypto.dao.UserDao;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.AuthenticationProvider;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.authentication.UserDetailsRepositoryReactiveAuthenticationManager;
+import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
+import org.springframework.security.config.web.server.SecurityWebFiltersOrder;
+import org.springframework.security.config.web.server.ServerHttpSecurity;
+import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
+import org.springframework.security.web.server.SecurityWebFilterChain;
 
 @Configuration
-@EnableWebSecurity
+@EnableWebFluxSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+
     private final JwtAuthenticationWebFilter jwtAuthFilter;
 
-    private final UserDao userDao;
+
+    private final ReactiveUserDetailsService userDetailsService;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) {
-        httpSecurity
-                .csrf(AbstractHttpConfigurer::disable)
-                .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/api/v1/auth").permitAll()
-                        .anyRequest().authenticated()
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+        return http
+                .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .authorizeExchange(auth -> auth
+                        .pathMatchers("/api/v1/auth", "/actuator/**").permitAll()
+                        .anyExchange().authenticated()
                 )
-                .sessionManagement(sessionManagementConfigurer ->
-                        sessionManagementConfigurer
-                                .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authenticationProvider(authenticationProvider())
-                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
-        return httpSecurity.build();
+                .addFilterAt(jwtAuthFilter, SecurityWebFiltersOrder.AUTHENTICATION)
+                .build();
     }
+
 
     @Bean
-    public AuthenticationProvider authenticationProvider() {
-        final DaoAuthenticationProvider daoAuthenticationProvider = new DaoAuthenticationProvider(userDetailsService());
-        daoAuthenticationProvider.setPasswordEncoder(passwordEncoder());
+    public ReactiveAuthenticationManager authenticationManager(PasswordEncoder passwordEncoder) {
 
-        return daoAuthenticationProvider;
+        UserDetailsRepositoryReactiveAuthenticationManager manager =
+                new UserDetailsRepositoryReactiveAuthenticationManager(userDetailsService);
+
+        manager.setPasswordEncoder(passwordEncoder);
+        return manager;
     }
 
-    @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration authenticationConfiguration) {
-        return authenticationConfiguration.getAuthenticationManager();
-    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public UserDetailsService userDetailsService() {
-        return userDao::findUserByEmail;
-    }
+
 }

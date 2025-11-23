@@ -7,7 +7,7 @@ import com.aquarius.crypto.dto.request.LoginRequestModel;
 import com.aquarius.crypto.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private final AuthenticationManager authenticationManager;
+    private final ReactiveAuthenticationManager authenticationManager;
 
     private final UserDao userDao;
 
