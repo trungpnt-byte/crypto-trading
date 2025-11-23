@@ -34,5 +34,4 @@ public class LocalApiResponse<T> {
                 .timestamp(ZonedDateTime.now())
                 .build();
     }
-
 }

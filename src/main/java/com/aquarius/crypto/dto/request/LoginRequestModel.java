@@ -1,4 +1,4 @@
-package com.aquarius.crypto.dto;
+package com.aquarius.crypto.dto.request;
 
 import lombok.Getter;
 import lombok.NoArgsConstructor;

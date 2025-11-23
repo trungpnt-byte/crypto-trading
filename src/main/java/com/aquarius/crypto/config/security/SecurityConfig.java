@@ -13,6 +13,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.NoOpPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -32,7 +33,7 @@ public class SecurityConfig {
         httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests((auth) -> auth
-                        .requestMatchers("/api/v1/auth", "/trade/v1/users/public/all").permitAll()
+                        .requestMatchers("/api/v1/auth").permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sessionManagementConfigurer ->
@@ -59,8 +60,7 @@ public class SecurityConfig {
 
     @Bean
     public PasswordEncoder passwordEncoder() {
-        //TODO
-        return NoOpPasswordEncoder.getInstance();
+        return new BCryptPasswordEncoder();
     }
 
     @Bean

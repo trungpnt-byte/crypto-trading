@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Repository
 public class UserDao {
@@ -30,19 +31,28 @@ public class UserDao {
                     Collections.singleton(new SimpleGrantedAuthority("ROLE_USER"))
             ),
             new User(
-                    "user@test.com",
-                    "admin123",
+                    "trader1",
+                    "$2a$12$hhUp7igUmXnd2RUWRmoG5uY1df2Ceo6tvzkgJWfdsTt3BkhzhZhqC",
+                    Collections.singleton(new SimpleGrantedAuthority("TRADER"))
+            ),
+            new User(
+                    "trader2",
+                    "$2a$12$hhUp7igUmXnd2RUWRmoG5uY1df2Ceo6tvzkgJWfdsTt3BkhzhZhqC",
                     Collections.singleton(new SimpleGrantedAuthority("TRADER"))
             ));
 
+    private final static ConcurrentHashMap<String, UserDetails> users = new ConcurrentHashMap<>() {{
+        for (UserDetails userDetails : APPLICATION_USERS) {
+            put(userDetails.getUsername(), userDetails);
+        }
+    }};
+
+
     public UserDetails findUserByEmail(String email) {
-        return APPLICATION_USERS.stream()
-                .filter(userDetails -> userDetails.getUsername().equals(email))
-                .findFirst()
-                .orElseThrow(
-                        () -> new UsernameNotFoundException(
-                                "User with username %s does not exist".formatted(email)
-                        )
-                );
+        UserDetails userDetails = users.get(email);
+        if (userDetails == null) {
+            throw new UsernameNotFoundException("User with email " + email + " not found");
+        }
+        return userDetails;
     }
 }

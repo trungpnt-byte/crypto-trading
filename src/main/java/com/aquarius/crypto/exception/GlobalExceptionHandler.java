@@ -19,12 +19,12 @@ import java.util.Map;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(AuthenticationException.class)
-    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleAuthenticationException(
+    public ResponseEntity<LocalApiResponse<Void>> handleAuthenticationException(
             AuthenticationException ex) {
         log.error("Authentication error: {}", ex.getMessage());
-        return Mono.just(ResponseEntity
+        return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.UNAUTHORIZED.value())));
+                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.UNAUTHORIZED.value()));
     }
 
     @ExceptionHandler(InsufficientBalanceException.class)
@@ -78,10 +78,12 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleGenericException(Exception ex) {
+    public LocalApiResponse<Void> handleGenericException(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
-        return Mono.just(ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(LocalApiResponse.error("An unexpected error occurred", HttpStatus.INTERNAL_SERVER_ERROR.value())));
+        return LocalApiResponse.<Void>builder()
+                .success(false)
+                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
+                .message("An unexpected error occurred")
+                .build();
     }
 }
