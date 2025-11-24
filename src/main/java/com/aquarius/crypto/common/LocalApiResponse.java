@@ -1,5 +1,6 @@
 package com.aquarius.crypto.common;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.*;
 
 import java.time.ZonedDateTime;
@@ -9,6 +10,7 @@ import java.time.ZonedDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Getter
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class LocalApiResponse<T> {
     private boolean success;
     private int status;
