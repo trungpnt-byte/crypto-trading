@@ -1,172 +1,120 @@
 package com.aquarius.crypto.service;
 
 
-import com.aquarius.crypto.dto.request.TradeRequest;
-import com.aquarius.crypto.dto.response.TradeResponse;
-import com.aquarius.crypto.exception.InsufficientBalanceException;
-import com.aquarius.crypto.exception.PriceNotFoundException;
-import com.aquarius.crypto.model.PriceAggregation;
+import com.aquarius.crypto.dto.TradeType;
+import com.aquarius.crypto.dto.request.TradingRequest;
 import com.aquarius.crypto.model.TradingTransaction;
 import com.aquarius.crypto.model.Wallet;
-import com.aquarius.crypto.repository.PriceAggregationRepository;
 import com.aquarius.crypto.repository.TradingTransactionRepository;
 import com.aquarius.crypto.repository.WalletRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.reactive.TransactionalOperator;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.Instant;
 
-@Slf4j
 @Service
-@RequiredArgsConstructor
 public class TradingService {
 
-    private final TradingTransactionRepository transactionRepository;
-    private final WalletRepository walletRepository;
-    private final PriceAggregationRepository priceRepository;
+    private static final int RETRIES = 5;
+    private final WalletRepository walletRepo;
+    private final WalletService walletService;
+    private final TradingTransactionRepository tradingTransactionRepo;
+    private final PriceAggregationService priceService;
+    private final TransactionalOperator tx;
 
-    @Transactional
-    public Mono<TradeResponse> executeTrade(Long userId, TradeRequest request) {
-        try {
-            Mono<PriceAggregation> priceMono = priceRepository.findLatestByTradingPair(request.getTradingPair());
-            return priceMono
-                    .switchIfEmpty(Mono.error(new PriceNotFoundException("No price available for " + request.getTradingPair())))
-                    .flatMap(price -> {
-                        BigDecimal executionPrice = "BUY".equals(request.getTradeType())
-                                ? price.getBestAskPrice()
-                                : price.getBestBidPrice();
+    public TradingService(WalletRepository walletRepo, WalletService walletService, TradingTransactionRepository tradingTransactionRepo, PriceAggregationService priceService, TransactionalOperator tx) {
+        this.walletRepo = walletRepo;
+        this.walletService = walletService;
+        this.tradingTransactionRepo = tradingTransactionRepo;
+        this.priceService = priceService;
+        this.tx = tx;
+    }
 
-                        BigDecimal totalAmount = request.getQuantity()
-                                .multiply(executionPrice)
-                                .setScale(8, RoundingMode.HALF_UP);
+    public Mono<TradingTransaction> trade(TradingRequest req) {
+        String base = req.getSymbol().substring(0, 3);
+        String quote = "USDT";
+        boolean isBuy = req.getTradeType().equalsIgnoreCase("BUY");
+        String debitCurrency = isBuy ? quote : base;
+        String creditCurrency = isBuy ? base : quote;
 
-                        return executeTrade(userId, request, executionPrice, totalAmount);
-                    });
-        } catch (Exception e) {
-            return Mono.error(e);
+        return priceService.bestPrice(req.getSymbol(), req.getTradeType())
+                .flatMap(price ->
+                        Mono.defer(() -> executeTrade(req, price, debitCurrency, creditCurrency))
+                )
+                .as(tx::transactional)
+                .retry(RETRIES);
+    }
+
+    private Mono<TradingTransaction> executeTrade(
+            TradingRequest req,
+            BigDecimal price,
+            String debitCurrency,
+            String creditCurrency
+    ) {
+        return Mono.defer(() ->
+                walletService.findByUserAndCurrency(req.getUserId(), debitCurrency)
+                        .zipWith(walletService.findByUserAndCurrency(req.getUserId(), creditCurrency))
+                        .switchIfEmpty(Mono.error(new RuntimeException("Wallet not found")))
+                        .flatMap(tuple -> performAtomicUpdate(tuple.getT1(), tuple.getT2(), req, price)));
+    }
+
+    private Mono<TradingTransaction> performAtomicUpdate(
+            Wallet debit,
+            Wallet credit,
+            TradingRequest req,
+            BigDecimal price
+    ) {
+        BigDecimal totalCost = price.multiply(req.getQuantity());
+
+        if (debit.getBalance().compareTo(totalCost) < 0) {
+            return Mono.error(new RuntimeException("Insufficient balance"));
         }
-    }
-
-    private Mono<TradeResponse> executeTrade(Long userId, TradeRequest request,
-                                             BigDecimal price, BigDecimal totalAmount) {
-        String baseCurrency = request.getTradingPair().replace("USDT", "");
-
-        if ("BUY".equals(request.getTradeType())) {
-            return processBuyOrder(userId, request, baseCurrency, price, totalAmount);
-        } else {
-            return processSellOrder(userId, request, baseCurrency, price, totalAmount);
-        }
-    }
-
-    private Mono<TradeResponse> processBuyOrder(Long userId, TradeRequest request,
-                                                String baseCurrency, BigDecimal price,
-                                                BigDecimal totalAmount) {
-        return walletRepository.findByUserIdAndCurrency(userId, "USDT")
-                .switchIfEmpty(Mono.error(new InsufficientBalanceException("USDT wallet not found")))
-                .flatMap(usdtWallet -> {
-                    if (usdtWallet.getBalance().compareTo(totalAmount) < 0) {
-                        return Mono.error(new InsufficientBalanceException(
-                                "Insufficient USDT balance. Required: " + totalAmount +
-                                        ", Available: " + usdtWallet.getBalance()));
-                    }
-
-                    usdtWallet.setBalance(usdtWallet.getBalance().subtract(totalAmount));
-                    usdtWallet.setUpdatedAt(Instant.now());
-
-                    return walletRepository.save(usdtWallet)
-                            .then(walletRepository.findByUserIdAndCurrency(userId, baseCurrency))
-                            .switchIfEmpty(createWallet(userId, baseCurrency))
-                            .flatMap(cryptoWallet -> {
-                                cryptoWallet.setBalance(cryptoWallet.getBalance().add(request.getQuantity()));
-                                cryptoWallet.setUpdatedAt(Instant.now());
-                                return walletRepository.save(cryptoWallet);
-                            })
-                            .then(createTransaction(userId, request, price, totalAmount, "COMPLETED"));
-                });
-    }
-
-    private Mono<TradeResponse> processSellOrder(Long userId, TradeRequest request,
-                                                 String baseCurrency, BigDecimal price,
-                                                 BigDecimal totalAmount) {
-        return walletRepository.findByUserIdAndCurrency(userId, baseCurrency)
-                .switchIfEmpty(Mono.error(new InsufficientBalanceException(baseCurrency + " wallet not found")))
-                .flatMap(cryptoWallet -> {
-                    if (cryptoWallet.getBalance().compareTo(request.getQuantity()) < 0) {
-                        return Mono.error(new InsufficientBalanceException(
-                                "Insufficient " + baseCurrency + " balance. Required: " +
-                                        request.getQuantity() + ", Available: " + cryptoWallet.getBalance()));
-                    }
-
-                    cryptoWallet.setBalance(cryptoWallet.getBalance().subtract(request.getQuantity()));
-                    cryptoWallet.setUpdatedAt(Instant.now());
-
-                    return walletRepository.save(cryptoWallet)
-                            .then(walletRepository.findByUserIdAndCurrency(userId, "USDT"))
-                            .flatMap(usdtWallet -> {
-                                usdtWallet.setBalance(usdtWallet.getBalance().add(totalAmount));
-                                usdtWallet.setUpdatedAt(Instant.now());
-                                return walletRepository.save(usdtWallet);
-                            })
-                            .then(createTransaction(userId, request, price, totalAmount, "COMPLETED"));
-                });
-    }
-
-    private Mono<Wallet> createWallet(Long userId, String currency) {
-        Wallet wallet = Wallet.builder()
-                .userId(userId)
-                .currency(currency)
-                .balance(BigDecimal.ZERO)
-                .createdAt(Instant.now())
-                .updatedAt(Instant.now())
+        Wallet updatedDebit = debit.toBuilder()
+                .balance(debit.getBalance().subtract(totalCost))
                 .build();
-        return walletRepository.save(wallet);
+
+        Wallet updatedCredit = credit.toBuilder()
+                .balance(credit.getBalance().add(req.getQuantity()))
+                .build();
+
+        return walletRepo.save(updatedDebit)
+                .flatMap(savedDebit -> walletRepo.save(updatedCredit))
+                .flatMap(savedCredit -> saveTrade(req, price))
+                .onErrorResume(OptimisticLockingFailureException.class, e -> {
+                    return Mono.error(new OptimisticLockingFailureException("[TradingService]Concurrent modification detected during trade"));
+                });
     }
 
-    private Mono<TradeResponse> createTransaction(Long userId, TradeRequest request,
-                                                  BigDecimal price, BigDecimal totalAmount,
-                                                  String status) {
-        TradingTransaction transaction = TradingTransaction.builder()
-                .userId(userId)
-                .tradingPair(request.getTradingPair())
-                .tradeType(request.getTradeType())
+    private Mono<TradingTransaction> saveTrade(TradingRequest req, BigDecimal price) {
+
+        TradingTransaction transaction = buildTransaction(req, price, price.multiply(req.getQuantity()), "COMPLETED");
+        return tradingTransactionRepo.save(transaction);
+    }
+
+    private TradingTransaction buildTransaction(TradingRequest request, BigDecimal price, BigDecimal totalAmount, String status) {
+        return TradingTransaction.builder()
+                .userId(request.getUserId())
+                .symbol(request.getSymbol().toUpperCase())
+                .tradeType(TradeType.from(request.getTradeType()))
                 .quantity(request.getQuantity())
                 .price(price)
                 .totalAmount(totalAmount)
                 .status(status)
                 .createdAt(Instant.now())
                 .build();
-
-        return transactionRepository.save(transaction)
-                .map(saved -> TradeResponse.builder()
-                        .transactionId(saved.getId())
-                        .tradingPair(saved.getTradingPair())
-                        .tradeType(saved.getTradeType())
-                        .quantity(saved.getQuantity())
-                        .price(saved.getPrice())
-                        .totalAmount(saved.getTotalAmount())
-                        .status(saved.getStatus())
-                        .timestamp(saved.getCreatedAt())
-                        .build());
     }
 
-    public Flux<TradeResponse> getUserTradingHistory(Long userId) {
-        return transactionRepository.findByUserIdOrderByCreatedAtDesc(userId)
-                .map(tx -> TradeResponse.builder()
-                        .transactionId(tx.getId())
-                        .tradingPair(tx.getTradingPair())
-                        .tradeType(tx.getTradeType())
-                        .quantity(tx.getQuantity())
-                        .price(tx.getPrice())
-                        .totalAmount(tx.getTotalAmount())
-                        .status(tx.getStatus())
-                        .timestamp(tx.getCreatedAt())
-                        .build());
+    //TODO move
+    public Flux<Wallet> getWalletBalances(Long eq) {
+        return null;
+    }
+
+    public Flux<TradingTransaction> getTradeHistory(Long userId) {
+        return tradingTransactionRepo.findByUserId(userId);
     }
 }
 

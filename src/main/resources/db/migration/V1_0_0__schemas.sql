@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     balance DECIMAL(20, 8) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    version INT NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE (user_id, currency)
     );
@@ -31,7 +32,7 @@ CREATE TABLE IF NOT EXISTS price_aggregations (
 CREATE TABLE IF NOT EXISTS trade_transactions (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL,
-    trading_pair VARCHAR(20) NOT NULL,
+    symbol VARCHAR(20) NOT NULL,
     trade_type VARCHAR(10) NOT NULL,
     quantity DECIMAL(20, 8) NOT NULL,
     price DECIMAL(20, 8) NOT NULL,
