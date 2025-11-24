@@ -14,4 +14,8 @@ public enum TradeType {
             default -> SELL;
         };
     }
+
+    public String getCode() {
+        return this.name();
+    }
 }

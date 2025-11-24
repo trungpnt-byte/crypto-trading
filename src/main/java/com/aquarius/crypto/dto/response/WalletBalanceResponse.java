@@ -1,5 +1,6 @@
 package com.aquarius.crypto.dto.response;
 
+import com.aquarius.crypto.model.Wallet;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -14,4 +15,11 @@ import java.math.BigDecimal;
 public class WalletBalanceResponse {
     private String currency;
     private BigDecimal balance;
+
+    public static WalletBalanceResponse fromEntity(Wallet wallet) {
+        return WalletBalanceResponse.builder()
+                .currency(wallet.getCurrency())
+                .balance(wallet.getBalance())
+                .build();
+    }
 }

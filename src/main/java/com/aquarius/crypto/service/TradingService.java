@@ -1,8 +1,10 @@
 package com.aquarius.crypto.service;
 
 
+import com.aquarius.crypto.common.LocalPaginatedResponse;
 import com.aquarius.crypto.dto.TradeType;
 import com.aquarius.crypto.dto.request.TradingRequest;
+import com.aquarius.crypto.dto.response.TradingHistoryResponse;
 import com.aquarius.crypto.model.TradingTransaction;
 import com.aquarius.crypto.model.Wallet;
 import com.aquarius.crypto.repository.TradingTransactionRepository;
@@ -13,6 +15,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.reactive.TransactionalOperator;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.util.retry.Retry;
 
@@ -159,4 +162,31 @@ public class TradingService {
                     return Mono.error(e);
                 });
     }
+
+
+    public Mono<LocalPaginatedResponse<TradingHistoryResponse>> getUserTradingHistoryPaginated(Long userId, int page, int size) {
+        int offset = page * size;
+        Mono<Long> totalCount = transactionRepo.findByUserId(userId).count();
+
+        Flux<TradingHistoryResponse> pagedTradingHistoryFlux = transactionRepo.findByUserIdOrderByCreatedAtDesc(userId)
+                .skip(offset)
+                .take(size)
+                .map(TradingHistoryResponse::fromEntity);
+        return totalCount.zipWith(pagedTradingHistoryFlux.collectList(),
+                (total, list) -> LocalPaginatedResponse.<TradingHistoryResponse>builder()
+                        .contents(list)
+                        .totalItems(total)
+                        .page(page)
+                        .size(size)
+                        .totalPages((int) Math.ceil((double) total / size))
+                        .build()
+        );
+    }
+
+
+    public Flux<TradingHistoryResponse> getUserTradingHistory(Long userId) {
+        return transactionRepo.findByUserIdOrderByCreatedAtDesc(userId)
+                .map(TradingHistoryResponse::fromEntity);
+    }
+
 }
