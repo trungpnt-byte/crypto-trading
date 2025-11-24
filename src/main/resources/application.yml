@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: crypto-trading
+
+  jpa:
+
+    properties:
+      hibernate:
+        format_sql: true
+        multiTenancy: SCHEMA
+        multi_tenant_connection_provider: com.aquarius.crypto.config.tenant.SchemaMultiTenantConnectionProvider
+    hibernate:
+      ddl-auto: create
+    generate-ddl: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+  datasource:
+    driverClassName: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 15
+      auto-commit: false
+  server:
+    shutdown: graceful
+  cache:
+    type: simple
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+
+application:
+  version: 1.0.0
+
+jwt:
+  secret: EY7sb93kFND8dkaPQL93msnSAD9203nfskdPqzOX19sNxtGfyXQ4T87Msldkf9AS
+  expirationMs: 36000000
+  refresh-expiration-ms: 86400000
+  access-token-ttl-seconds: 3000 # 50 minutes
+  cookie-domain: "localhost"
+  cookie-path: "/"
+
+refresh-token-ttl-seconds: 604800 # 7 days
+
+logging:
+  level:
+    org:
+      springframework: INFO
+    com:
+      aquarius:
+        crypto: DEBUG
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+crypto:
+  scheduler:
+    price-aggregation-interval: 6000 # 1 minute in milliseconds

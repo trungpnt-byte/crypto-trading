@@ -11,14 +11,14 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class BinanceTickerResponse {
     private String symbol;
-    private String bidPrice;
-    private String askPrice;
+    private BigDecimal bidPrice;
+    private BigDecimal askPrice;
 
     public TickerResponse toTickerResponse(String source) {
         return new TickerResponse(
                 this.symbol,
-                new BigDecimal(this.bidPrice),
-                new BigDecimal(this.askPrice),
+                this.bidPrice,
+                this.askPrice,
                 source
         );
     }

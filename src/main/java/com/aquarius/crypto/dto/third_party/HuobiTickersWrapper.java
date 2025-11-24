@@ -1,6 +1,5 @@
-package com.aquarius.crypto.dto;
+package com.aquarius.crypto.dto.third_party;
 
-import com.aquarius.crypto.dto.third_party.HuobiTicker;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

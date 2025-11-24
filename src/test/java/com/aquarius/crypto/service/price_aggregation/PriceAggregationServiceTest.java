@@ -2,7 +2,7 @@ package com.aquarius.crypto.service.price_aggregation;
 
 import com.aquarius.crypto.dto.third_party.HuobiTicker;
 import com.aquarius.crypto.dto.third_party.BinanceTickerResponse;
-import com.aquarius.crypto.dto.HuobiTickersWrapper;
+import com.aquarius.crypto.dto.third_party.HuobiTickersWrapper;
 import com.aquarius.crypto.model.PriceAggregation;
 import com.aquarius.crypto.repository.PriceAggregationRepository;
 import com.aquarius.crypto.service.PriceAggregationService;
@@ -45,16 +45,9 @@ class PriceAggregationServiceTest {
     @BeforeEach
     void setUp() {
         service = new PriceAggregationService(latestPriceRepository, webClient);
-
-        // General setup for WebClient chain: webClient.get().uri(anyString()).retrieve()
         when(webClient.get()).thenReturn(requestHeadersUriSpec);
         when(requestHeadersUriSpec.uri(anyString())).thenReturn(requestHeadersSpec);
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-
-        // Mock repository save to return the object it was asked to save (for verification)
-//        when(latestPriceRepository.save(any(PriceAggregation.class))).thenAnswer(invocation ->
-//                Mono.just(invocation.getArgument(0))
-//        );
     }
 
     /**
@@ -65,16 +58,9 @@ class PriceAggregationServiceTest {
             List<BinanceTickerResponse> binanceList,
             HuobiTickersWrapper huobiWrapper
     ) {
-        // --- Mocking Binance Response (for /bookTicker) ---
         when(requestHeadersSpec.retrieve()).thenReturn(responseSpec);
-
-        // 1. When bodyToFlux(BinanceTickerResponse.class) is called (by fetchBinancePrices)
-        when(responseSpec.bodyToFlux(BinanceTickerResponse.class))
-                .thenReturn(Flux.fromIterable(binanceList));
-
-        // 2. When bodyToMono(HuobiTickersWrapper.class) is called (by fetchHuobiPrices)
-        when(responseSpec.bodyToMono(HuobiTickersWrapper.class))
-                .thenReturn(Mono.just(huobiWrapper));
+        when(responseSpec.bodyToFlux(BinanceTickerResponse.class)).thenReturn(Flux.fromIterable(binanceList));
+        when(responseSpec.bodyToMono(HuobiTickersWrapper.class)).thenReturn(Mono.just(huobiWrapper));
     }
 
 
@@ -85,12 +71,12 @@ class PriceAggregationServiceTest {
         // BTCUSDT: Best Bid: 60000 (Binance), Best Ask: 60050 (Binance)
 
         List<BinanceTickerResponse> binanceList = List.of(
-                new BinanceTickerResponse("ETHUSDT", "1990.00", "1.0", "2010.00", "1.0"),
-                new BinanceTickerResponse("BTCUSDT", "60000.00", "1.0", "60050.00", "1.0")
+                new BinanceTickerResponse("ETHUSDT", new BigDecimal("2000.00"), new BigDecimal("2005.00")),
+                new BinanceTickerResponse("BTCUSDT", new BigDecimal("60000.00"), new BigDecimal("60050.00"))
         );
         List<HuobiTicker> huobiTickers = List.of(
                 new HuobiTicker("ethusdt", new BigDecimal("1995.00"), new BigDecimal("2005.00")),
-                new HuobiTicker("btcusdt", new BigDecimal("59990.00"), new BigDecimal("60060.00"))
+                new HuobiTicker("btcusdt", new BigDecimal("59950.00"), new BigDecimal("60100.00"))
         );
         mockExchangeResponses(binanceList, new HuobiTickersWrapper(huobiTickers));
 
@@ -123,7 +109,7 @@ class PriceAggregationServiceTest {
 
         // 1. Mock Binance to fail/error (to trigger onErrorResume)
         when(responseSpec.bodyToFlux(BinanceTickerResponse.class))
-                .thenReturn(Flux.error(new RuntimeException("Binance Down")));
+                .thenReturn(Flux.error(new RuntimeException("Binance Service Is Unavailable")));
 
         // 2. Mock Huobi to succeed
         List<HuobiTicker> huobiTickers = List.of(
@@ -163,7 +149,7 @@ class PriceAggregationServiceTest {
         // Both exchanges offer the EXACT SAME BEST PRICE
 
         List<BinanceTickerResponse> binanceList = List.of(
-                new BinanceTickerResponse("ETHUSDT", "2000.00", "1.0", "2005.00", "1.0")
+                new BinanceTickerResponse("ETHUSDT", new BigDecimal("2000.00"), new BigDecimal("2005.00"))
         );
         List<HuobiTicker> huobiTickers = List.of(
                 new HuobiTicker("ethusdt", new BigDecimal("2000.00"), new BigDecimal("2005.00"))

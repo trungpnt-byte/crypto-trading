@@ -1,0 +1,35 @@
+# --- Flyway Config ---
+spring:
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    schemas: public,trader,admin,broker
+    url: ${jdbc.url}
+    user: ${jdbc.username}
+    password: ${jdbc.password}
+  # Addl Spring Boot configs
+  r2dbc:
+    username: ${r2dbc.username}
+    password: ${r2dbc.password}
+    url: ${r2dbc.url}
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+    #defer-datasource-initialization: false
+    #main:
+    #allow-bean-definition-overriding: true
+
+# R2DBC Reactive stack
+r2dbc:
+  username: trading-postgres
+  password: admin123
+  url: r2dbc:postgresql://localhost:5432/trading-db
+
+# for Flyway
+jdbc:
+  username: ${r2dbc.username}
+  password: ${r2dbc.password}
+  url: jdbc:postgresql://localhost:5432/trading-db

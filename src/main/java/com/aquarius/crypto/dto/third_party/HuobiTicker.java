@@ -15,10 +15,10 @@ public class HuobiTicker {
     private BigDecimal ask;
 
     public TickerResponse toTickerResponse(String source) {
-        String standardizedSymbol = this.symbol.toUpperCase();
+        String normalizedSymbol = this.symbol.toUpperCase();
 
         return new TickerResponse(
-                standardizedSymbol,
+                normalizedSymbol,
                 this.bid,
                 this.ask,
                 source
