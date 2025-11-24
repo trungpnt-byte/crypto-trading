@@ -14,6 +14,4 @@ public interface WalletRepository extends R2dbcRepository<Wallet, Long> {
 
     @Query("SELECT * FROM wallets WHERE user_id = $1 AND currency = $2")
     Mono<Wallet> findByUserAndCurrency(Long userId, String currency);
-
-
 }

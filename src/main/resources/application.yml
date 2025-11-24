@@ -22,25 +22,36 @@ spring:
     shutdown: graceful
   cache:
     type: simple
-springdoc:
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    path: /swagger-ui.html
 
+# Mismatched springframework versions.
+#springdoc:
+#  swagger-ui:
+#    path: /swagger-ui.html
+#  api-docs:
+#    path: /v3/api-docs
+#  info:
+#    title: Crypto Trading Exchange API
+#    version: v1
+#    description: Production-Ready Reactive API for ETH/BTC Trading and Wallet Management.
+#    contact:
+#      name: Raymond
+#      email: raymond@aquarius.com
+#    license:
+#      name: Apache 2.0
+#      url: https://www.apache.org/licenses/LICENSE-2.0.html
 
 application:
   version: 1.0.0
 
 jwt:
-  secret: EY7sb93kFND8dkaPQL93msnSAD9203nfskdPqzOX19sNxtGfyXQ4T87Msldkf9AS
+  secret: ${JWT_SIGNING_SECRET:}
   expirationMs: 36000000
   refresh-expiration-ms: 86400000
   access-token-ttl-seconds: 3000 # 50 minutes
   cookie-domain: "localhost"
   cookie-path: "/"
-
-refresh-token-ttl-seconds: 604800 # 7 days
+  accessTokenTtlSeconds: 900
+  refreshTokenTtlSeconds: 604800
 
 logging:
   level:

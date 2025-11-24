@@ -1,33 +1,63 @@
 package com.aquarius.crypto.service;
 
 import com.aquarius.crypto.common.JwtProperties;
-import com.aquarius.crypto.entities.UserPrincipal;
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
-import org.springframework.security.core.userdetails.UserDetails;
+import com.aquarius.crypto.common.UUIDConverter;
+import com.aquarius.crypto.common.UUIDHelper;
+import com.aquarius.crypto.model.UserPrincipal;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.MissingClaimException;
+import io.jsonwebtoken.SignatureAlgorithm;
 import org.springframework.stereotype.Component;
 
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
 import java.time.Instant;
-import java.util.*;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 @Component
 public class JwtService {
 
     private final JwtProperties props;
-    private final SecretKey key;
+    private final RSAPublicKey publicKey; // Used for verification (parser)
+    private final RSAPrivateKey privateKey; // Used for signing
     private final JwtParser parser;
 
-    public JwtService(JwtProperties props) {
+    public JwtService(JwtProperties props, RSAPublicKey publicKey, RSAPrivateKey privateKey) {
         this.props = props;
-        this.key = Keys.hmacShaKeyFor(props.getSecret().getBytes(StandardCharsets.UTF_8));
-        this.parser = Jwts.parserBuilder().setSigningKey(key).build();
+        this.publicKey = publicKey;
+        this.privateKey = privateKey;
+        this.parser = Jwts.parserBuilder().setSigningKey(this.publicKey).build();
     }
 
-    public String extractUsername(String token) {
-        return extractClaim(token, Claims::getSubject);
+    public Map<String, String> validateAndExtractClaims(String token) {
+        if (isTokenExpired(token)) {
+            throw new ExpiredJwtException(null, null, "JWT token is expired.");
+        }
+
+        Claims claims = extractAllClaims(token);
+
+        String publicIdStr = claims.get("user_public_id", String.class);
+        String tenantId = claims.get("tenant_id", String.class);
+
+        if (publicIdStr == null) {
+            throw new MissingClaimException(null, claims, "Required claim 'user_public_id' is missing.");
+        }
+        UUIDHelper.ensureValid(publicIdStr);
+        if (tenantId == null) {
+            throw new MissingClaimException(null, claims, "Required claim 'tenant_id' is missing.");
+        }
+
+        Map<String, String> extractedClaims = new HashMap<>();
+        extractedClaims.put("publicId", publicIdStr);
+        extractedClaims.put("tenantId", tenantId);
+
+        return extractedClaims;
     }
 
     public Date extractExpiration(String token) {
@@ -47,85 +77,31 @@ public class JwtService {
         return extractExpiration(token).before(new Date());
     }
 
-    public String generateAccessToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
-        return generateAccessToken(claims, username);
-    }
-
-    public String generateAccessToken(UserDetails userDetails) {
-        Map<String, Object> claims = new HashMap<>();
-        return generateAccessToken(claims, userDetails.getUsername());
-    }
-
-    private String generateAccessToken(Map<String, Object> claims, String subject) {
-        Instant now = Instant.now();
-        return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(subject)
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(now.plusSeconds(props.getAccessTokenTtlSeconds())))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
 
     public String generateAccessToken(UserPrincipal principal) {
         Instant now = Instant.now();
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("user_public_id", principal.publicId().toString());
+        claims.put("tenant_id", principal.tenantId());
+        claims.put("roles", principal.getAuthorities());
         return Jwts.builder()
                 .setSubject(principal.getUsername())
-                .claim("roles", principal.getAuthorities()) // custom claims
+                .setClaims(claims)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(now.plusSeconds(props.getAccessTokenTtlSeconds())))
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(this.privateKey, SignatureAlgorithm.RS256)
                 .compact();
     }
 
     public String generateRefreshToken(UserPrincipal principal) {
         Instant now = Instant.now();
+        String subject = UUIDConverter.uuidToString(principal.publicId());
         return Jwts.builder()
-                .setSubject(principal.getUsername())
+                .setSubject(subject)
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(now.plusSeconds(props.getRefreshTokenTtlSeconds())))
-                .signWith(key, SignatureAlgorithm.HS256)
+                .signWith(this.privateKey, SignatureAlgorithm.RS256)
                 .compact();
-    }
-
-    public Jws<Claims> parseClaims(String token) throws JwtException {
-        return parser.parseClaimsJws(token);
-    }
-
-    public String extractUserName(String token) {
-        // extract the username from jwt token
-        return extractClaim(token, Claims::getSubject);
-    }
-
-    public boolean validateToken(String token, UserDetails userDetails) {
-        final String userName = extractUserName(token);
-        return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
-    }
-
-
-    public boolean validateToken(String token) {
-        try {
-            parseClaims(token);
-            return true;
-        } catch (JwtException ex) {
-            return false;
-        }
-    }
-
-    public String getUsername(String token) {
-        return parseClaims(token).getBody().getSubject();
-    }
-
-    @SuppressWarnings("unchecked")
-    public List<String> getRoles(String token) {
-        Claims c = parseClaims(token).getBody();
-        Object roles = c.get("roles");
-        if (roles instanceof List) {
-            return (List<String>) roles;
-        }
-        return Collections.emptyList();
     }
 }
 

@@ -1,5 +1,6 @@
 services:
-  trading-service:
+  # Trading service
+  crypto-trading-service:
     build: .
     ports:
       - "8080:8080"
@@ -8,6 +9,7 @@ services:
     networks:
       - trading-network
 
+  # PostgreSQL database service
   db:
     image: 'postgres:latest'
     container_name: trading-db

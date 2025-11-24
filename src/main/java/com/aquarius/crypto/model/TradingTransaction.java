@@ -17,16 +17,16 @@ import java.time.Instant;
 @AllArgsConstructor
 @Getter
 @Setter
-@Table(name = "trade_transactions")
+@Table(name = "trading_transactions")
 public class TradingTransaction {
     @Id
     private Long id;
     private Long userId;
     private String symbol;
-    private TradeType tradeType; // BUY or SELL
+    private TradeType tradeType;
     private BigDecimal quantity;
-    private BigDecimal price; // price per unit of base currency at which the trade was executed
-    private BigDecimal totalAmount; // how much crypto was spent/received in the trade
-    private String status; // COMPLETED, FAILED
+    private BigDecimal price;
+    private BigDecimal totalAmount;
+    private String status;
     private Instant createdAt;
 }
