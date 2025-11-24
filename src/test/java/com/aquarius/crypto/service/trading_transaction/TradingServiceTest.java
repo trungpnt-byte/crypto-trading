@@ -1,11 +1,8 @@
 package com.aquarius.crypto.service.trading_transaction;
 
-import com.aquarius.crypto.dto.TradeType;
 import com.aquarius.crypto.dto.request.TradingRequest;
-import com.aquarius.crypto.model.PriceAggregation;
 import com.aquarius.crypto.model.TradingTransaction;
 import com.aquarius.crypto.model.Wallet;
-import com.aquarius.crypto.repository.PriceAggregationRepository;
 import com.aquarius.crypto.repository.TradingTransactionRepository;
 import com.aquarius.crypto.repository.WalletRepository;
 import com.aquarius.crypto.service.PriceAggregationService;
@@ -13,111 +10,154 @@ import com.aquarius.crypto.service.TradingService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 
+import static com.aquarius.crypto.helper.TestDataCreator.createWallet;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+
+
+import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
+import org.mockito.InOrder;
+import org.springframework.transaction.reactive.TransactionalOperator;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
 class TradingServiceTest {
 
     @Mock
-    private TradingTransactionRepository transactionRepository;
-
+    private WalletRepository walletRepo;
     @Mock
-    private WalletRepository walletRepository;
-
+    private TradingTransactionRepository transactionRepo;
     @Mock
-    private PriceAggregationRepository priceRepository;
-
+    private PriceAggregationService priceService;
     @Mock
-    private PriceAggregationService priceAggregationService;
+    private TransactionalOperator rxtx;
 
-    @InjectMocks
     private TradingService tradingService;
 
-    private Long userId;
-    private TradingRequest buyRequest;
-    private PriceAggregation priceAggregation;
-    private Wallet usdtWallet;
-    private Wallet ethWallet;
+    @Captor
+    private ArgumentCaptor<Wallet> walletCaptor;
 
     @BeforeEach
     void setUp() {
-        userId = 1L;
-
-        buyRequest = TradingRequest.builder()
-                .tradingPair("ETHUSDT")
-                .tradeType("BUY")
-                .symbol("ETHUSDT")
-                .quantity(new BigDecimal("1.0"))
-                .build();
-
-        priceAggregation = PriceAggregation.builder()
-                .id(1L)
-                .tradingPair("ETHUSDT")
-                .bestBidPrice(new BigDecimal("2000.00"))
-                .bestAskPrice(new BigDecimal("2001.00"))
-                .source("BINANCE_HUOBI")
-                .createdAt(Instant.now())
-                .build();
-
-        usdtWallet = Wallet.builder()
-                .id(1L)
-                .userId(userId)
-                .currency("USDT")
-                .balance(new BigDecimal("50000.00"))
-                .build();
-
-        ethWallet = Wallet.builder()
-                .id(2L)
-                .userId(userId)
-                .currency("ETH")
-                .balance(BigDecimal.ZERO)
-                .build();
+        tradingService = new TradingService(walletRepo, transactionRepo, priceService, rxtx);
+        lenient().when(rxtx.transactional(any(Mono.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
-    void executeBuyTrade_Success() {
-        when(priceRepository.findLatestByTradingPair("ETHUSDT"))
-                .thenReturn(Mono.just(priceAggregation));
-        when(walletRepository.findByUserIdAndCurrency(userId, "USDT"))
-                .thenReturn(Mono.just(usdtWallet));
-        when(walletRepository.findByUserIdAndCurrency(userId, "ETH"))
-                .thenReturn(Mono.just(ethWallet));
-        when(walletRepository.save(any(Wallet.class)))
-                .thenAnswer(invocation -> Mono.just(invocation.getArgument(0)));
+    void testBuyExecution_CorrectlyDebitsQuoteAndCreditsBase() {
+        // GIVEN: buy 1.0 ETH at 2000 USDT
+        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
 
-        TradingTransaction savedTransaction = TradingTransaction.builder()
-                .id(1L)
-                .userId(userId)
-                .tradingPair("ETHUSDT")
-                .tradeType(TradeType.valueOf("BUY"))
-                .quantity(new BigDecimal("1.0"))
-                .price(new BigDecimal("2001.00"))
-                .totalAmount(new BigDecimal("2001.00"))
-                .status("COMPLETED")
-                .createdAt(Instant.now())
-                .build();
+        Wallet usdtWallet = createWallet(10L, "USDT", "5000.00");
+        Wallet ethWallet = createWallet(20L, "ETH", "0.00");
 
-        when(transactionRepository.save(any(TradingTransaction.class)))
-                .thenReturn(Mono.just(savedTransaction));
+        when(priceService.bestPrice("ETHUSDT", "BUY")).thenReturn(Mono.just(new BigDecimal("2000.00")));
+        when(walletRepo.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(usdtWallet));
+        when(walletRepo.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(ethWallet));
+        when(walletRepo.save(any(Wallet.class))).thenAnswer(i -> Mono.just(i.getArgument(0)));
+        when(transactionRepo.save(any())).thenReturn(Mono.just(new TradingTransaction()));
 
-        StepVerifier.create(tradingService.executeTrade(buyRequest))
-                .expectNextMatches(response ->
-                        response.getId().equals(1L) &&
-                                response.getTradeType().equals("BUY") &&
-                                response.getStatus().equals("COMPLETED")
-                ).verifyComplete();
+        // WHEN
+        StepVerifier.create(tradingService.trade(req))
+                .expectNextCount(1)
+                .verifyComplete();
 
-        verify(walletRepository, times(2)).save(any(Wallet.class));
-        verify(transactionRepository, times(1)).save(any(TradingTransaction.class));
+        // THEN:
+        verify(walletRepo, times(2)).save(walletCaptor.capture());
+        var savedWallets = walletCaptor.getAllValues();
+
+        // Check USDT (Debit)
+        Wallet savedUsdt = savedWallets.stream().filter(w -> w.getCurrency().equals("USDT")).findFirst().get();
+        assertEquals(0, new BigDecimal("3000.00").compareTo(savedUsdt.getBalance()), "USDT should decrease by Cost (2000)");
+
+        // Check ETH (Credit)
+        Wallet savedEth = savedWallets.stream().filter(w -> w.getCurrency().equals("ETH")).findFirst().get();
+        assertEquals(0, new BigDecimal("1.0").compareTo(savedEth.getBalance()), "ETH should increase by Quantity (1.0)");
+    }
+
+    @Test
+    void testSellExecution_CorrectlyDebitsBaseAndCreditsQuote() {
+        // GIVEN: User wants to SELL 0.5 ETH at 3000 USDT
+        // Cost Logic: 0.5 ETH * 3000 = 1500 USDT Value
+        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "SELL", new BigDecimal("0.5"));
+
+        Wallet usdtWallet = createWallet(10L, "USDT", "1000.00");
+        Wallet ethWallet = createWallet(20L, "ETH", "2.00");
+
+        when(priceService.bestPrice("ETHUSDT", "SELL")).thenReturn(Mono.just(new BigDecimal("3000.00")));
+        when(walletRepo.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(usdtWallet));
+        when(walletRepo.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(ethWallet));
+        when(walletRepo.save(any(Wallet.class))).thenAnswer(i -> Mono.just(i.getArgument(0)));
+        when(transactionRepo.save(any())).thenReturn(Mono.just(new TradingTransaction()));
+
+        // WHEN
+        StepVerifier.create(tradingService.trade(req))
+                .expectNextCount(1)
+                .verifyComplete();
+
+        // THEN
+        verify(walletRepo, times(2)).save(walletCaptor.capture());
+        var savedWallets = walletCaptor.getAllValues();
+
+        // Check ETH (Debit)
+        Wallet savedEth = savedWallets.stream().filter(w -> w.getCurrency().equals("ETH")).findFirst().get();
+        // Should be 2.00 - 0.5 = 1.5.
+        assertEquals(0, new BigDecimal("1.5").compareTo(savedEth.getBalance()), "ETH should decrease by Quantity (0.5)");
+        // Check USDT (Credit)
+        Wallet savedUsdt = savedWallets.stream().filter(w -> w.getCurrency().equals("USDT")).findFirst().get();
+        assertEquals(0, new BigDecimal("2500.00").compareTo(savedUsdt.getBalance()), "USDT should increase by Value (1500)");
+    }
+
+    @Test
+    void testDeadlockPrevention_SavesLowerIdFirst() {
+        // GIVEN
+        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
+        // ID 200 (USDT) vs ID 100 (ETH)
+        // save ETH (100) first because 100 < 200.
+        Wallet highIdWallet = createWallet(200L, "USDT", "5000.00");
+        Wallet lowIdWallet = createWallet(100L, "ETH", "0.00");
+
+        when(priceService.bestPrice(any(), any())).thenReturn(Mono.just(new BigDecimal("100.00")));
+        when(walletRepo.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(highIdWallet));
+        when(walletRepo.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(lowIdWallet));
+        when(walletRepo.save(any(Wallet.class))).thenAnswer(i -> Mono.just(i.getArgument(0)));
+        when(transactionRepo.save(any())).thenReturn(Mono.just(new TradingTransaction()));
+
+        // WHEN
+        tradingService.trade(req).block();
+
+        InOrder inOrder = inOrder(walletRepo);
+
+        // save ID 100 first, then ID 200
+        inOrder.verify(walletRepo).save(argThat(w -> w.getId().equals(100L)));
+        inOrder.verify(walletRepo).save(argThat(w -> w.getId().equals(200L)));
+    }
+
+    @Test
+    void testInsufficientBalance_ThrowsError() {
+        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
+        Wallet poorWallet = createWallet(1L, "USDT", "10.00"); // Only have 10
+        Wallet ethWallet = createWallet(2L, "ETH", "0.00");
+
+        when(priceService.bestPrice(any(), any())).thenReturn(Mono.just(new BigDecimal("2000.00")));
+        when(walletRepo.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(poorWallet));
+        when(walletRepo.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(ethWallet));
+
+        StepVerifier.create(tradingService.trade(req))
+                .expectErrorMatches(t -> t instanceof IllegalArgumentException && t.getMessage().contains("Insufficient USDT"))
+                .verify();
+
+        verify(walletRepo, never()).save(any());
     }
 }

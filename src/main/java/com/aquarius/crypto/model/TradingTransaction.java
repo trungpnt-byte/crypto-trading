@@ -22,7 +22,7 @@ public class TradingTransaction {
     @Id
     private Long id;
     private Long userId;
-    private String tradingPair;
+    private String symbol;
     private TradeType tradeType; // BUY or SELL
     private BigDecimal quantity;
     private BigDecimal price; // price per unit of base currency at which the trade was executed

@@ -11,6 +11,4 @@ import reactor.core.publisher.Mono;
 public interface PriceAggregationRepository extends R2dbcRepository<PriceAggregation, Long> {
     @Query(value = "SELECT * FROM price_aggregations WHERE trading_pair = :tradingPair ORDER BY created_at DESC LIMIT 1")
     Mono<PriceAggregation> findLatestByTradingPair(@Param("tradingPair") String tradingPair);
-
-    Mono<PriceAggregation> save(PriceAggregation aggregation);
 }
