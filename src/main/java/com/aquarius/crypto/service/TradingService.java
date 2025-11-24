@@ -28,7 +28,7 @@ import java.time.Instant;
 @Slf4j
 public class TradingService {
 
-    private final WalletRepository walletRepo;
+    private final WalletService walletService;
     private final TradingTransactionRepository transactionRepo;
     private final PriceAggregationService priceService;
     private final TransactionalOperator rxtx;
@@ -74,7 +74,7 @@ public class TradingService {
      * Logic: Find existing wallet. If missing, check toggle.
      */
     private Mono<Wallet> resolveWallet(Long userId, String currency) {
-        return walletRepo.findByUserAndCurrency(userId, currency)
+        return walletService.findByUserAndCurrency(userId, currency)
                 .switchIfEmpty(Mono.defer(() -> {
                     if (this.autoCreateWallets) {
                         return createNewWallet(userId, currency);
@@ -94,7 +94,7 @@ public class TradingService {
                 .balance(BigDecimal.ZERO)
                 .version(0L)
                 .build();
-        return walletRepo.save(newWallet);
+        return walletService.save(newWallet);
     }
 
     private Mono<TradingTransaction> saveTransactionAudit(
@@ -150,9 +150,9 @@ public class TradingService {
 
         Mono<Wallet> saveFlow;
         if (updatedDebit.getId() < updatedCredit.getId()) {
-            saveFlow = walletRepo.save(updatedDebit).then(walletRepo.save(updatedCredit));
+            saveFlow = walletService.save(updatedDebit).then(walletService.save(updatedCredit));
         } else {
-            saveFlow = walletRepo.save(updatedCredit).then(walletRepo.save(updatedDebit));
+            saveFlow = walletService.save(updatedCredit).then(walletService.save(updatedDebit));
         }
 
         return saveFlow

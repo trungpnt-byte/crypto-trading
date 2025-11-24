@@ -1,12 +1,14 @@
 package com.aquarius.crypto.dto.request;
 
 import lombok.*;
+import org.springframework.lang.Nullable;
 
 import java.math.BigDecimal;
 
 @Data
 @Builder
 @Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class TradingRequest {
@@ -16,7 +18,7 @@ public class TradingRequest {
     private BigDecimal quantity; // Amount of base currency (ETH/BTC) to trade
 
     public void validate() {
-        if (userId == null || symbol == null || tradeType == null || quantity == null) {
+        if (symbol == null || tradeType == null || quantity == null) {
             throw new IllegalArgumentException("All fields must be provided");
         }
         if (quantity.compareTo(BigDecimal.ZERO) <= 0) {

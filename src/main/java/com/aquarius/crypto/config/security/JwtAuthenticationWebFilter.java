@@ -2,62 +2,79 @@ package com.aquarius.crypto.config.security;
 
 
 import com.aquarius.crypto.common.ExtractionHelper;
+import com.aquarius.crypto.common.UUIDConverter;
+import com.aquarius.crypto.exception.UserAuthenticationException;
 import com.aquarius.crypto.service.JwtService;
+import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.core.userdetails.ReactiveUserDetailsService;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
+
+import static com.aquarius.crypto.constants.ConstStrings.BEARER;
 
 @Component
+@Slf4j
 public class JwtAuthenticationWebFilter implements WebFilter {
 
-    private final ReactiveUserDetailsService userDetailsService;
     private final JwtService jwtService;
+    private final TenantMappingService tenantMappingService;
 
-    public JwtAuthenticationWebFilter(ReactiveUserDetailsService userDetailsService, JwtService jwtService) {
-        this.userDetailsService = userDetailsService;
+    public JwtAuthenticationWebFilter(JwtService jwtService, TenantMappingService tenantMappingService) {
         this.jwtService = jwtService;
+        this.tenantMappingService = tenantMappingService;
     }
 
+    @NotNull
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
-        String authHeader = exchange.getRequest().getHeaders().getFirst("Authorization");
+        String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null || !authHeader.startsWith(BEARER)) {
             return chain.filter(exchange);
         }
 
         final String jwtToken = ExtractionHelper.extractTokenValue(authHeader);
 
-        return Mono.defer(() -> {
-            String userEmail = jwtService.extractUsername(jwtToken);
+        return Mono.fromCallable(() -> jwtService.validateAndExtractClaims(jwtToken))
+                .subscribeOn(Schedulers.boundedElastic())
+                .flatMap(claims -> {
+                    String publicIdStr = claims.get("publicId");
+                    String tenantClaim = claims.get("tenantId");
+                    String schema = tenantMappingService.mapJwtTenantToSchema(tenantClaim)
+                            .orElseThrow(() -> new UserAuthenticationException("Invalid tenant claim: " + tenantClaim));
 
-            if (userEmail == null) {
-                return chain.filter(exchange);
-            }
+                    Authentication auth = createAuthenticationToken(Objects.requireNonNull(UUIDConverter.stringToUuid(publicIdStr)));
 
-            return userDetailsService.findByUsername(userEmail)
-                    .filter(userDetails -> jwtService.validateToken(jwtToken, userDetails))
-                    .map(userDetails -> createAuthenticationToken(userDetails, exchange))
-                    .flatMap(authentication ->
-                            chain.filter(exchange)
-                                    .contextWrite(ReactiveSecurityContextHolder.withAuthentication(authentication))
-                    ).switchIfEmpty(chain.filter(exchange));
-        });
+                    return chain.filter(exchange)
+                            .contextWrite(ReactiveSecurityContextHolder.withAuthentication(auth))
+                            .contextWrite(ctx -> ctx.put("TENANT_ID_KEY", schema));
+                })
+                .onErrorResume(e -> {
+                    log.warn("Authentication failure (JWT/Tenant): {}", e.getMessage());
+                    exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                    return exchange.getResponse().setComplete();
+                });
     }
 
-    private UsernamePasswordAuthenticationToken createAuthenticationToken(
-            UserDetails userDetails, ServerWebExchange exchange) {
-
+    private Authentication createAuthenticationToken(UUID publicId) {
         return new UsernamePasswordAuthenticationToken(
-                userDetails,
+                publicId.toString(),
                 null,
-                userDetails.getAuthorities()
+                List.of(new SimpleGrantedAuthority("TRADER"))
         );
     }
 }

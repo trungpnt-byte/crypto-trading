@@ -1,23 +1,24 @@
 package com.aquarius.crypto.service;
 
 import com.aquarius.crypto.common.LocalPaginatedResponse;
-import com.aquarius.crypto.dto.response.TradingHistoryResponse;
 import com.aquarius.crypto.dto.response.WalletBalanceResponse;
 import com.aquarius.crypto.model.Wallet;
 import com.aquarius.crypto.repository.WalletRepository;
-import io.r2dbc.spi.Result;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+
+import java.util.List;
 
 @Service
 public class WalletService {
 
+    private final SecurityContextService securityContextService;
     private final WalletRepository walletRepository;
 
-    public WalletService(WalletRepository walletRepository) {
+    public WalletService(SecurityContextService securityContextService, WalletRepository walletRepository) {
+        this.securityContextService = securityContextService;
         this.walletRepository = walletRepository;
     }
 
@@ -25,31 +26,46 @@ public class WalletService {
         return walletRepository.findByUserAndCurrency(userId, debitCurrency);
     }
 
-    /**
-     * Retrieves all non-zero balances for a user.
-     * Prod-Tip: Filter out zero balances to reduce payload size if desired.
-     */
-    public Flux<WalletBalanceResponse> getUserWalletBalances(Long userId) {
-        return walletRepository.findByUserId(userId)
-                .map(WalletBalanceResponse::fromEntity);
+    public Flux<WalletBalanceResponse> getUserWalletBalances() {
+        return securityContextService.getInternalUserId()
+                .flatMapMany(internalId -> walletRepository.findByUserId(internalId)
+                        .map(WalletBalanceResponse::fromEntity))
+                .switchIfEmpty(Flux.error(new UsernameNotFoundException(
+                        "No wallet balances found for the authenticated user.")));
     }
 
-    public Mono<LocalPaginatedResponse<WalletBalanceResponse>> getUserWalletsPaginated(Long userId, int page, int size) {
+    public Mono<LocalPaginatedResponse<WalletBalanceResponse>> getUserWalletsPaginated(int page, int size) {
+        Mono<Long> internalIdMono = securityContextService.getInternalUserId();
         int offset = page * size;
-        Mono<Long> totalCount = walletRepository.findByUserId(userId).count();
+        return internalIdMono.flatMap(internalId -> {
+                    Mono<Long> totalCount = walletRepository.findByUserId(internalId).count();
+                    Mono<List<WalletBalanceResponse>> pagedListMono = walletRepository.findByUserId(internalId)
+                            .skip(offset)
+                            .take(size)
+                            .map(WalletBalanceResponse::fromEntity)
+                            .collectList();
+                    return totalCount.zipWith(pagedListMono);
+                }).<LocalPaginatedResponse<WalletBalanceResponse>>handle((tuple, sink) -> {
+                    long total = tuple.getT1();
+                    List<WalletBalanceResponse> list = tuple.getT2();
 
-        Flux<WalletBalanceResponse> pagedTradingHistoryFlux = walletRepository.findByUserId(userId)
-                .skip(offset)
-                .take(size)
-                .map(WalletBalanceResponse::fromEntity);
-        return totalCount.zipWith(pagedTradingHistoryFlux.collectList(),
-                (total, list) -> LocalPaginatedResponse.<WalletBalanceResponse>builder()
-                        .contents(list)
-                        .page(page)
-                        .size(size)
-                        .totalItems(total)
-                        .totalPages((int) Math.ceil((double) total / size))
-                        .build()
-        );
+                    if (list.isEmpty() && total == 0) {
+                        sink.error(new UsernameNotFoundException("No wallet data found for authenticated user."));
+                        return;
+                    }
+
+                    sink.next(LocalPaginatedResponse.<WalletBalanceResponse>builder()
+                            .contents(list)
+                            .page(page)
+                            .size(size)
+                            .totalItems(total)
+                            .totalPages((int) Math.ceil((double) total / size))
+                            .build());
+                })
+                .switchIfEmpty(Mono.error(new UsernameNotFoundException("User identity could not be resolved or mapped.")));
+    }
+
+    public Mono<Wallet> save(Wallet toPersist) {
+        return walletRepository.save(toPersist);
     }
 }

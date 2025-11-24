@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Mono;
 
 @RestController
-@RequestMapping("/api/v1/prices")
+@RequestMapping("/api/v1")
 @RequiredArgsConstructor
 public class PriceController {
 
     private final PriceAggregationService priceService;
 
-    @GetMapping("/{tradingPair}")
+    @GetMapping("/prices/{trading-pair}")
     public Mono<ResponseEntity<LocalApiResponse<AggregatedPriceResponse>>> getLatestPrice(
             @PathVariable String tradingPair) {
 

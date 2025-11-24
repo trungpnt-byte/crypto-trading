@@ -11,9 +11,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableR2dbcAuditing
 @ConfigurationPropertiesScan(basePackages = "com.aquarius")
 public class CryptoTradingApplication {
-
     public static void main(String[] args) {
         SpringApplication.run(CryptoTradingApplication.class, args);
     }
-
 }

@@ -3,15 +3,10 @@ package com.aquarius.crypto.service;
 import com.aquarius.crypto.model.User;
 import com.aquarius.crypto.repository.UserRepository;
 import org.springframework.security.authentication.ReactiveAuthenticationManager;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-
-import java.util.List;
 
 @Service
 public class UserService {
@@ -22,33 +17,24 @@ public class UserService {
 
     private final JwtService jwtService;
 
-    private final BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(BCryptPasswordEncoder.BCryptVersion.$2Y, 10);
+    private final PasswordEncoder encoder;
 
-    public UserService(UserRepository userRepository, JwtService jwtService, ReactiveAuthenticationManager authenticationManager) {
+    public UserService(UserRepository userRepository, JwtService jwtService, ReactiveAuthenticationManager authenticationManager, PasswordEncoder encoder) {
         this.userRepository = userRepository;
         this.authenticationManager = authenticationManager;
         this.jwtService = jwtService;
+        this.encoder = encoder;
     }
 
-    public User register(User user) {
+    public Mono<User> findByPublicId(String username) {
+        return userRepository.findByUsername(username);
+    }
+
+    public Mono<User> registerUser(User user) {
         user.setPassword(encoder.encode(user.getPassword()));
-        return userRepository.save(user).block();
+        return userRepository.save(user);
     }
 
-    public String verify(User user) {
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(
-                        user.getUsername(),
-                        user.getPassword()
-                )
-        ).block();
-
-        if (authentication.isAuthenticated()) {
-            return jwtService.generateAccessToken(user.getUsername());
-        }
-
-        return "Failed";
-    }
 
     public Mono<User> createUser(User user) {
         user.setPassword(encoder.encode(user.getPassword()));
@@ -57,6 +43,10 @@ public class UserService {
 
     public Mono<User> findByEmail(String email) {
         return userRepository.findByEmail(email);
+    }
+
+    public Mono<User> findByUsername(String username) {
+        return userRepository.findByUsername(username);
     }
 
     public Flux<User> findAll() {

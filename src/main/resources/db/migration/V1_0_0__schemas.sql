@@ -1,13 +1,21 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+-- Users table
 CREATE TABLE IF NOT EXISTS users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     username VARCHAR(50) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
-    role VARCHAR(35) DEFAULT 'TRADER',
+    public_id UUID DEFAULT gen_random_uuid() NOT NULL,
+    tenant_id VARCHAR(50) DEFAULT 'trader' NOT NULL,
+    simple_role VARCHAR(50) DEFAULT 'TRADER' NOT NULL,
     email VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+);
+ALTER TABLE users
+    ADD CONSTRAINT uk_public_id UNIQUE (public_id);
 
+-- Wallets table
 CREATE TABLE IF NOT EXISTS wallets (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL,
@@ -18,8 +26,9 @@ CREATE TABLE IF NOT EXISTS wallets (
     version INT NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE (user_id, currency)
-    );
+);
 
+-- Price aggregations table
 CREATE TABLE IF NOT EXISTS price_aggregations (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     trading_pair VARCHAR(20) NOT NULL,
@@ -27,9 +36,10 @@ CREATE TABLE IF NOT EXISTS price_aggregations (
     best_ask_price DECIMAL(20, 8) NOT NULL,
     source VARCHAR(50),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
+);
 
-CREATE TABLE IF NOT EXISTS trade_transactions (
+-- Trade transactions table
+CREATE TABLE IF NOT EXISTS trading_transactions (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
     user_id BIGINT NOT NULL,
     symbol VARCHAR(20) NOT NULL,
@@ -40,5 +50,5 @@ CREATE TABLE IF NOT EXISTS trade_transactions (
     status VARCHAR(20) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
-    );
+);
 

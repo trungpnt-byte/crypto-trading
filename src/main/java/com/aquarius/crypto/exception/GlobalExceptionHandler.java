@@ -2,6 +2,7 @@ package com.aquarius.crypto.exception;
 
 
 import com.aquarius.crypto.common.LocalApiResponse;
+import io.jsonwebtoken.MissingClaimException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +19,24 @@ import java.util.Map;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(AuthenticationException.class)
+    @ExceptionHandler(UserAuthenticationException.class)
     public ResponseEntity<LocalApiResponse<Void>> handleAuthenticationException(
-            AuthenticationException ex) {
-        log.error("Authentication error: {}", ex.getMessage());
+            UserAuthenticationException ex) {
+        log.error("Authentication failed: {}", ex.getMessage());
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
                 .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.UNAUTHORIZED.value()));
     }
+
+    @ExceptionHandler(MissingClaimException.class)
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleMissingClaimException(
+            MissingClaimException ex) {
+        log.error("Missing claim: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.BAD_REQUEST.value())));
+    }
+
 
     @ExceptionHandler(InsufficientBalanceException.class)
     public Mono<ResponseEntity<LocalApiResponse<Void>>> handleInsufficientBalanceException(
@@ -79,12 +90,11 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(Exception.class)
-    public LocalApiResponse<Void> handleGenericException(Exception ex) {
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleGenericException(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);
-        return LocalApiResponse.<Void>builder()
-                .success(false)
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .message("An unexpected error occurred")
-                .build();
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(LocalApiResponse.error("An unexpected error occurred",
+                        HttpStatus.INTERNAL_SERVER_ERROR.value())));
     }
 }
