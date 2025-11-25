@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
     tenant_id VARCHAR(50) DEFAULT 'trader' NOT NULL,
     simple_role VARCHAR(50) DEFAULT 'TRADER' NOT NULL,
     email VARCHAR(100),
+    preferred_timezone VARCHAR(100) DEFAULT 'UTC' NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP
 );
 ALTER TABLE users
     ADD CONSTRAINT uk_public_id UNIQUE (public_id);
@@ -22,7 +23,7 @@ CREATE TABLE IF NOT EXISTS wallets (
     currency VARCHAR(10) NOT NULL,
     balance DECIMAL(20, 8) NOT NULL DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP,
     version INT NOT NULL DEFAULT 0,
     FOREIGN KEY (user_id) REFERENCES users(id),
     UNIQUE (user_id, currency)

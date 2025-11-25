@@ -1,6 +1,8 @@
 package com.aquarius.crypto.dto.response;
 
+import com.aquarius.crypto.dto.LocalizedInstantSerializer;
 import com.aquarius.crypto.model.TradingTransaction;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,6 +23,7 @@ public class TradingHistoryResponse {
     private BigDecimal price;
     private BigDecimal totalAmount;
     private String status;
+    @JsonSerialize(using = LocalizedInstantSerializer.class)
     private Instant timestamp;
 
     public static TradingHistoryResponse fromEntity(TradingTransaction history) {

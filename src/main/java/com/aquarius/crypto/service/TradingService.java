@@ -5,10 +5,10 @@ import com.aquarius.crypto.common.LocalPaginatedResponse;
 import com.aquarius.crypto.dto.TradeType;
 import com.aquarius.crypto.dto.request.TradingRequest;
 import com.aquarius.crypto.dto.response.TradingHistoryResponse;
+import com.aquarius.crypto.entity_manager.WalletFactory;
 import com.aquarius.crypto.model.TradingTransaction;
 import com.aquarius.crypto.model.Wallet;
 import com.aquarius.crypto.repository.TradingTransactionRepository;
-import com.aquarius.crypto.repository.WalletRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,6 +32,7 @@ public class TradingService {
     private final TradingTransactionRepository transactionRepo;
     private final PriceAggregationService priceService;
     private final TransactionalOperator rxtx;
+    private final WalletFactory walletFactory = WalletFactory.INSTANCE;
 
     @Value("${app.trading.auto-create-wallet:false}")
     private boolean autoCreateWallets;
@@ -77,7 +78,7 @@ public class TradingService {
         return walletService.findByUserAndCurrency(userId, currency)
                 .switchIfEmpty(Mono.defer(() -> {
                     if (this.autoCreateWallets) {
-                        return createNewWallet(userId, currency);
+                        return createAndSaveNewWallet(userId, currency);
                     } else {
                         return Mono.error(new IllegalArgumentException(
                                 "Wallet not found for currency: " + currency + ". Auto-creation is disabled."
@@ -86,14 +87,12 @@ public class TradingService {
                 }));
     }
 
-    private Mono<Wallet> createNewWallet(Long userId, String currency) {
+    private Mono<Wallet> createAndSaveNewWallet(Long userId, String currency) {
+        if (!this.autoCreateWallets) {
+            return Mono.error(new IllegalStateException("Auto-creation of wallets is disabled."));
+        }
         log.info("Auto-creating new wallet for User: {} Currency: {}", userId, currency);
-        Wallet newWallet = Wallet.builder()
-                .userId(userId)
-                .currency(currency)
-                .balance(BigDecimal.ZERO)
-                .version(0L)
-                .build();
+        Wallet newWallet = walletFactory.createNewWallet(userId, currency);
         return walletService.save(newWallet);
     }
 

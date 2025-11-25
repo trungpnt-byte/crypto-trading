@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.time.Instant;
 import java.util.List;
 
 @Service
@@ -66,6 +67,7 @@ public class WalletService {
     }
 
     public Mono<Wallet> save(Wallet toPersist) {
+        toPersist.setUpdatedAt(Instant.now());
         return walletRepository.save(toPersist);
     }
 }

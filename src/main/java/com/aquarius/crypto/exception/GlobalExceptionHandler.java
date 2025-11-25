@@ -74,6 +74,15 @@ public class GlobalExceptionHandler {
                         HttpStatus.INTERNAL_SERVER_ERROR.value())));
     }
 
+    @ExceptionHandler(UserNotFoundException.class)
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleUserNotFoundException(
+            UserNotFoundException ex) {
+        log.error("User not found: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.NOT_FOUND.value())));
+    }
+
     @ExceptionHandler(WebExchangeBindException.class)
     public Mono<ResponseEntity<LocalApiResponse<Map<String, String>>>> handleValidationException(
             WebExchangeBindException ex) {

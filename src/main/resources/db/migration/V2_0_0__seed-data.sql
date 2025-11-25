@@ -1,10 +1,10 @@
 -- Description: Seed initial data for traders and their wallets
 -- Seed users
-INSERT INTO users (username, password, email, simple_role, public_id)
+INSERT INTO users (username, password, email, simple_role, public_id, preferred_timezone)
 VALUES ('trader1', '$2a$12$/mFKGx.CfMjpW.boZP7KEOMY3OietIBv8Okw2UdZYSth0bSZ5PdGG', 'trader1@app.com', 'TRADER',
-        'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'),
+        'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'America/New_York'),
        ('trader2', '{bcrypt}$2a$12$hhUp7igUmXnd2RUWRmoG5uY1df2Ceo6tvzkgJWfdsTt3BkhzhZhqC', 'trader2@app.com', 'TRADER',
-        'b8f2a5b6-7d3c-4e8f-8d2a-4a6c9e0a1b32');
+        'b8f2a5b6-7d3c-4e8f-8d2a-4a6c9e0a1b32', 'Europe/London');
 
 -- Seed wallets for trader1
 INSERT INTO wallets (user_id, currency, balance)

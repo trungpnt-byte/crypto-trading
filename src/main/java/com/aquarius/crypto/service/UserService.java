@@ -1,8 +1,8 @@
 package com.aquarius.crypto.service;
 
+import com.aquarius.crypto.exception.UserNotFoundException;
 import com.aquarius.crypto.model.User;
 import com.aquarius.crypto.repository.UserRepository;
-import org.springframework.security.authentication.ReactiveAuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -11,18 +11,13 @@ import reactor.core.publisher.Mono;
 @Service
 public class UserService {
 
+    private final SecurityContextService securityContextService;
     private final UserRepository userRepository;
-
-    private final ReactiveAuthenticationManager authenticationManager;
-
-    private final JwtService jwtService;
-
     private final PasswordEncoder encoder;
 
-    public UserService(UserRepository userRepository, JwtService jwtService, ReactiveAuthenticationManager authenticationManager, PasswordEncoder encoder) {
+    public UserService(SecurityContextService securityContextService, UserRepository userRepository, PasswordEncoder encoder) {
+        this.securityContextService = securityContextService;
         this.userRepository = userRepository;
-        this.authenticationManager = authenticationManager;
-        this.jwtService = jwtService;
         this.encoder = encoder;
     }
 
@@ -51,5 +46,14 @@ public class UserService {
 
     public Flux<User> findAll() {
         return userRepository.findAll();
+    }
+
+    public Mono<User> updateUserTimezone(String timezoneId) {
+        return securityContextService.getInternalUserId()
+                .flatMap(userId -> userRepository.findById(userId)
+                        .flatMap(user -> {
+                            user.setPreferredTimezone(timezoneId);
+                            return userRepository.save(user);
+                        }).switchIfEmpty(Mono.error(new UserNotFoundException("User not found."))));
     }
 }

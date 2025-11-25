@@ -28,6 +28,7 @@ public class User implements Persistable<Long>, BeforeConvertCallback<User> {
     private Instant createdAt;
     private Instant updatedAt;
     private String simpleRole;
+    private String preferredTimezone;
     private String tenantId;
     private UUID publicId;
 
@@ -44,5 +45,8 @@ public class User implements Persistable<Long>, BeforeConvertCallback<User> {
     @Override
     public boolean isNew() {
         return id == null;
+    }
+
+    public void setPreferredTimezone(String timezoneId) {
     }
 }
