@@ -1,4 +1,4 @@
-package com.aquarius.crypto.config.security;
+package com.aquarius.crypto.config.tenant;
 
 
 import org.springframework.stereotype.Service;

@@ -1,5 +1,6 @@
 package com.aquarius.crypto.config.flyway;
 
+import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.Flyway;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
@@ -10,6 +11,7 @@ import jakarta.annotation.PostConstruct;
 import java.util.List;
 
 @Configuration
+@Slf4j
 public class FlywayConfig {
 
     private static final String POSTGRES_DRIVER = "org.postgresql.Driver";
@@ -40,9 +42,9 @@ public class FlywayConfig {
                     .schemas(tenant)
                     .load();
 
-            System.out.println("Starting Flyway migration for tenant: " + tenant);
+            log.info("Starting Flyway migration for tenant: {}", tenant);
             flyway.migrate();
-            System.out.println("Finished Flyway migration for tenant: " + tenant);
+            log.info("Finished Flyway migration for tenant: {}", tenant);
         }
     }
 

@@ -15,7 +15,7 @@ import org.springframework.test.context.DynamicPropertySource;
 
 @DataR2dbcTest
 @Testcontainers
-class UserRepositoryTest {
+class UserRepositoryIntegrationTest {
 
     @Container
     @ServiceConnection
@@ -42,8 +42,8 @@ class UserRepositoryTest {
                     assert savedUser.getUsername().equals("testuser");
                     assert savedUser.getPassword().equals("testpass");
                     assert savedUser.getEmail().equals("blah@gmail.com");
+//                    assert reverseParseUUID(savedUser.getPublicId());
                 })
                 .verifyComplete();
     }
-
 }

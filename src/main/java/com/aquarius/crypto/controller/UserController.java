@@ -21,7 +21,7 @@ public class UserController {
     @PreAuthorize("hasRole('TRADER')")
     @GetMapping("/users/name")
     public Mono<LocalApiResponse<UserResponseModel>> findByName(String userName) {
-        return userService.findByEmail(userName)
+        return userService.findByUsername(userName)
                 .map(user -> {
                     UserResponseModel responseModel = UserResponseModel.builder()
                             .username(user.getUsername())

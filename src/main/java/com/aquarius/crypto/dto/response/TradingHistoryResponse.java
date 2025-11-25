@@ -1,6 +1,5 @@
 package com.aquarius.crypto.dto.response;
 
-import com.aquarius.crypto.dto.TradeType;
 import com.aquarius.crypto.model.TradingTransaction;
 import lombok.AllArgsConstructor;
 import lombok.Builder;

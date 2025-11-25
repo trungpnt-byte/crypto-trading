@@ -1,14 +1,13 @@
 spring:
   application:
     name: crypto-trading
-
   jpa:
-
     properties:
       hibernate:
         format_sql: true
         multiTenancy: SCHEMA
         multi_tenant_connection_provider: com.aquarius.crypto.config.tenant.SchemaMultiTenantConnectionProvider
+        tenant_identifier_resolver: com.aquarius.crypto.config.tenant.ReactiveCurrentTenantResolver
     hibernate:
       ddl-auto: create
     generate-ddl: true
@@ -61,14 +60,6 @@ logging:
       aquarius:
         crypto: DEBUG
 
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: always
 
 crypto:
   scheduler:

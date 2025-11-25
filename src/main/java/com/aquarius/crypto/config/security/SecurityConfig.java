@@ -1,5 +1,6 @@
 package com.aquarius.crypto.config.security;
 
+import com.aquarius.crypto.filter.JwtAuthenticationWebFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

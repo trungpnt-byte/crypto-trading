@@ -1,14 +1,11 @@
 package com.aquarius.crypto.model;
 
+import lombok.*;
 import org.jetbrains.annotations.NotNull;
 import org.reactivestreams.Publisher;
+import org.springframework.data.domain.Persistable;
 import org.springframework.data.r2dbc.mapping.event.BeforeConvertCallback;
 import org.springframework.data.relational.core.mapping.Table;
-import lombok.Builder;
-import lombok.NoArgsConstructor;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.sql.SqlIdentifier;
 import reactor.core.publisher.Mono;
@@ -22,7 +19,7 @@ import java.util.UUID;
 @Getter
 @Setter
 @Table(name = "users")
-public class User implements BeforeConvertCallback<User> {
+public class User implements Persistable<Long>, BeforeConvertCallback<User> {
     @Id
     private Long id;
     private String username;
@@ -34,6 +31,7 @@ public class User implements BeforeConvertCallback<User> {
     private String tenantId;
     private UUID publicId;
 
+    //TODO: not working as JPA's EntityListeners
     @NotNull
     @Override
     public Publisher<User> onBeforeConvert(User entity, @NotNull SqlIdentifier table) {
@@ -41,5 +39,10 @@ public class User implements BeforeConvertCallback<User> {
             entity.setPublicId(UUID.randomUUID());
         }
         return Mono.just(entity);
+    }
+
+    @Override
+    public boolean isNew() {
+        return id == null;
     }
 }

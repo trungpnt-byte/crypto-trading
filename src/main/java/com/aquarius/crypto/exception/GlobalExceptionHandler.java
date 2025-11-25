@@ -37,6 +37,14 @@ public class GlobalExceptionHandler {
                 .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.BAD_REQUEST.value())));
     }
 
+    @ExceptionHandler(StalePriceException.class)
+    public Mono<ResponseEntity<LocalApiResponse<Void>>> handleInsufficientBalanceException(
+            StalePriceException ex) {
+        log.error("Insufficient balance: {}", ex.getMessage());
+        return Mono.just(ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(LocalApiResponse.error(ex.getMessage(), HttpStatus.BAD_REQUEST.value())));
+    }
 
     @ExceptionHandler(InsufficientBalanceException.class)
     public Mono<ResponseEntity<LocalApiResponse<Void>>> handleInsufficientBalanceException(

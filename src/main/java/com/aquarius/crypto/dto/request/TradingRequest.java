@@ -1,9 +1,14 @@
 package com.aquarius.crypto.dto.request;
 
-import lombok.*;
-import org.springframework.lang.Nullable;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Data
 @Builder
@@ -27,5 +32,6 @@ public class TradingRequest {
         if (!tradeType.equals("BUY") && !tradeType.equals("SELL")) {
             throw new IllegalArgumentException("Trade type must be either BUY or SELL");
         }
+        quantity = quantity.setScale(8, RoundingMode.HALF_UP);
     }
 }
