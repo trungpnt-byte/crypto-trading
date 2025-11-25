@@ -16,14 +16,13 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.HashSet;
-import java.util.stream.Collectors;
 
 import static com.aquarius.crypto.constants.ConstStrings.BTC_PAIR;
 import static com.aquarius.crypto.constants.ConstStrings.ETH_PAIR;
@@ -67,57 +66,78 @@ public class PriceAggregationService {
 
     @Scheduled(fixedDelayString = "${crypto.scheduler.price-aggregation-interval}")
     public void aggregatePrices() {
-        log.info(SVC_NAME + "Starting price aggregation...");
+        log.info(SVC_NAME + " Starting price aggregation...");
+
         Flux.fromIterable(marketTickerProviders)
                 .flatMap(provider -> provider.fetchTickers(SUPPORTED_PAIRS))
-                .collectMultimap(TickerResponse::getSymbol)
-                .flatMap(this::processGroupedTickers)
+                .collectList()
+                .flatMap(this::processTickers)
                 .subscribe();
     }
 
-    private Mono<Void> processGroupedTickers(Map<String, Collection<TickerResponse>> groupedData) {
-        List<PriceAggregation> aggregatedPricesToSave = new ArrayList<>();
 
-        for (String pair : SUPPORTED_PAIRS) {
-            Collection<TickerResponse> tickers = groupedData.get(pair);
+    private Mono<Void> processTickers(List<TickerResponse> allTickers) {
+        Map<String, TickerResponse[]> bestMap = new HashMap<>();
+        Map<String, StringBuilder> sourcesMap = new HashMap<>();
 
-            if (tickers == null || tickers.isEmpty()) {
-                log.warn("No price data received for {}", pair);
-                continue;
-            }
+        for (TickerResponse t : allTickers) {
+            String symbol = t.getSymbol();
+            TickerResponse[] pair = bestMap.getOrDefault(symbol, new TickerResponse[2]);
+            StringBuilder sources = sourcesMap.getOrDefault(symbol, new StringBuilder());
 
-            TickerResponse bestBidTicker = null;
-            TickerResponse bestAskTicker = null;
-            for (TickerResponse t : tickers) {
-                if (t.getBidPrice() != null &&
-                        (bestBidTicker == null || t.getBidPrice().compareTo(bestBidTicker.getBidPrice()) > 0)) {
-                    bestBidTicker = t;
+            // Update best bid
+            if (t.getBidPrice() != null &&
+                    (pair[0] == null || t.getBidPrice().compareTo(pair[0].getBidPrice()) > 0)) {
+                pair[0] = t;
+                sources.setLength(0); // reset sources
+                sources.append(t.getSource()).append("_BID");
+            } else if (pair[0] != null && t.getBidPrice() != null &&
+                    t.getBidPrice().compareTo(pair[0].getBidPrice()) == 0) {
+                if (!sources.isEmpty()) {
+                    sources.append("|");
                 }
-                if (t.getAskPrice() != null &&
-                        (bestAskTicker == null || t.getAskPrice().compareTo(bestAskTicker.getAskPrice()) < 0)) {
-                    bestAskTicker = t;
+                sources.append(t.getSource()).append("_BID");
+            }
+
+            // Update best ask
+            if (t.getAskPrice() != null &&
+                    (pair[1] == null || t.getAskPrice().compareTo(pair[1].getAskPrice()) < 0)) {
+                pair[1] = t;
+                if (!sources.isEmpty()) sources.append("|");
+                sources.append(t.getSource()).append("_ASK");
+            } else if (pair[1] != null && t.getAskPrice() != null &&
+                    t.getAskPrice().compareTo(pair[1].getAskPrice()) == 0) {
+                if (!sources.isEmpty() && !sources.toString().contains(t.getSource() + "_ASK")) {
+                    sources.append("|").append(t.getSource()).append("_ASK");
                 }
             }
 
-            if (bestBidTicker == null || bestAskTicker == null) {
-                continue;
-            }
-
-            aggregatedPricesToSave.add(PriceAggregation.builder()
-                    .tradingPair(pair)
-                    .bestBidPrice(bestBidTicker.getBidPrice())
-                    .bestAskPrice(bestAskTicker.getAskPrice())
-                    .source(formatSources(tickers, bestBidTicker.getBidPrice(), bestAskTicker.getAskPrice()))
-                    .createdAt(Instant.now())
-                    .build());
+            bestMap.put(symbol, pair);
+            sourcesMap.put(symbol, sources);
         }
+
+        List<PriceAggregation> aggregatedPricesToSave = bestMap.entrySet().stream()
+                .map(e -> {
+                    TickerResponse[] pair = e.getValue();
+                    if (pair[0] == null || pair[1] == null) return null;
+
+                    return PriceAggregation.builder()
+                            .tradingPair(e.getKey())
+                            .bestBidPrice(pair[0].getBidPrice())
+                            .bestAskPrice(pair[1].getAskPrice())
+                            .source(sourcesMap.get(e.getKey()).toString())
+                            .createdAt(Instant.now())
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
 
         if (aggregatedPricesToSave.isEmpty()) {
             return Mono.empty();
         }
 
         return priceAggregationRepository.saveAll(aggregatedPricesToSave)
-                .doOnComplete(() -> log.info(SVC_NAME + "Saved {} aggregated prices", aggregatedPricesToSave.size()))
+                .doOnComplete(() -> log.info(SVC_NAME + " Saved {} aggregated prices", aggregatedPricesToSave.size()))
                 .then();
     }
 
@@ -134,18 +154,4 @@ public class PriceAggregationService {
         }
         return Mono.just(price);
     }
-
-    private String formatSources(Collection<TickerResponse> tickers, BigDecimal bestBid, BigDecimal bestAsk) {
-        return tickers.stream()
-                .map(t -> {
-                    String s = "";
-                    if (t.getBidPrice().compareTo(bestBid) == 0) s += t.getSource() + "_BID";
-                    if (t.getAskPrice().compareTo(bestAsk) == 0) s += (s.isEmpty() ? "" : "|") + t.getSource() + "_ASK";
-                    return s;
-                })
-                .filter(s -> !s.isEmpty())
-                .collect(Collectors.joining("|"));
-    }
-
-
 }
