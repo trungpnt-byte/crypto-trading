@@ -20,22 +20,38 @@ public class SecurityContextService {
         this.userMappingService = userMappingService;
     }
 
-    public Mono<Long> getInternalUserId() {
+    public Mono<UserPrincipal> getCurrentUser() {
         return ReactiveSecurityContextHolder.getContext()
                 .mapNotNull(SecurityContext::getAuthentication)
-                .switchIfEmpty(Mono.error(() -> new UsernameNotFoundException("Authentication context not found.")))
+                .switchIfEmpty(Mono.error(() ->
+                        new UsernameNotFoundException("Authentication context not found.")))
                 .mapNotNull(Authentication::getPrincipal)
                 .cast(String.class)
-                .flatMap(uuidStr -> {
-                    try {
-                        UUID publicId = UUIDConverter.stringToUuid(uuidStr);
-                        return userMappingService.findByPublicId(publicId);
-                    } catch (IllegalArgumentException e) {
-                        return Mono.error(new IllegalStateException("Invalid UUID format in Principal.", e));
-                    }
-                })
-                .map(UserPrincipal::internalId)
+                .flatMap(this::findUserByPublicIdString);
+    }
 
-                .switchIfEmpty(Mono.error(() -> new UsernameNotFoundException("User identity could not be resolved.")));
+    public Mono<UUID> getCurrentPublicId() {
+        return getCurrentUser()
+                .map(UserPrincipal::publicId);
+    }
+
+    public Mono<Long> getInternalUserId() {
+        return getCurrentUser()
+                .map(UserPrincipal::internalId);
+    }
+
+    private Mono<UserPrincipal> findUserByPublicIdString(String uuidStr) {
+        try {
+            UUID publicId = UUIDConverter.stringToUuid(uuidStr);
+            return findUserByPublicId(publicId);
+        } catch (IllegalArgumentException e) {
+            return Mono.error(new IllegalStateException("Invalid UUID format in Principal.", e));
+        }
+    }
+
+    private Mono<UserPrincipal> findUserByPublicId(UUID publicId) {
+        return userMappingService.findByPublicId(publicId)
+                .switchIfEmpty(Mono.error(() ->
+                        new UsernameNotFoundException("User not found for publicId: " + publicId)));
     }
 }

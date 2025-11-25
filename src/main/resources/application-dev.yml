@@ -4,7 +4,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-    schemas: public,trader,admin,broker
+    schemas: public
+    # TODO: normal jpa would work with multiple schemas, later with r2dbc..
+    #trader,admin,broker
+    default-schema: public
     url: ${jdbc.url}
     user: ${jdbc.username}
     password: ${jdbc.password}
@@ -33,3 +36,8 @@ jdbc:
   username: ${r2dbc.username}
   password: ${r2dbc.password}
   url: jdbc:postgresql://localhost:5432/trading-db
+
+# Application specific configs
+app:
+  trading:
+    auto-create-wallet: false

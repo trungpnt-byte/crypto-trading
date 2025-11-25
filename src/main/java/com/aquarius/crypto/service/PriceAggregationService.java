@@ -1,6 +1,5 @@
 package com.aquarius.crypto.service;
 
-import com.aquarius.crypto.config.tenant.TenantContext;
 import com.aquarius.crypto.dto.response.AggregatedPriceResponse;
 import com.aquarius.crypto.dto.third_party.MarketTickerProvider;
 import com.aquarius.crypto.dto.third_party.TickerResponse;
@@ -26,12 +25,15 @@ import java.util.Set;
 import java.util.HashSet;
 import java.util.stream.Collectors;
 
+import static com.aquarius.crypto.constants.ConstStrings.BTC_PAIR;
+import static com.aquarius.crypto.constants.ConstStrings.ETH_PAIR;
+
 @Slf4j
 @Service
 public class PriceAggregationService {
     private static final String SVC_NAME = "[PriceAggregationService] ";
     @Value("${crypto.supported-pairs:ETHUSDT,BTCUSDT}")
-    private static final Set<String> SUPPORTED_PAIRS = new HashSet<>(Arrays.asList("ETHUSDT", "BTCUSDT"));
+    private static final Set<String> SUPPORTED_PAIRS = new HashSet<>(Arrays.asList(ETH_PAIR, BTC_PAIR));
     private final List<MarketTickerProvider> marketTickerProviders;
     private final PriceAggregationRepository priceAggregationRepository;
     private final SecurityContextService securityContextService;
@@ -53,7 +55,7 @@ public class PriceAggregationService {
                 .map(p -> tradeType.equals("BUY") ? p.getBestAskPrice() : p.getBestBidPrice());
     }
 
-    public Mono<AggregatedPriceResponse> findByTradingPair(String symbol) {
+    public Mono<AggregatedPriceResponse> findLatestByTradingPair(String symbol) {
         return priceAggregationRepository.findLatestByTradingPair(symbol)
                 .map(lp -> new AggregatedPriceResponse(
                         lp.getTradingPair(),

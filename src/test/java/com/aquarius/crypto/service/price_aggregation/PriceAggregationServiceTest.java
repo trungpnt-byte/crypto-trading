@@ -4,6 +4,7 @@ import com.aquarius.crypto.dto.third_party.MarketTickerProvider;
 import com.aquarius.crypto.model.PriceAggregation;
 import com.aquarius.crypto.repository.PriceAggregationRepository;
 import com.aquarius.crypto.service.PriceAggregationService;
+import com.aquarius.crypto.service.SecurityContextService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -16,6 +17,8 @@ import reactor.core.publisher.Flux;
 import java.math.BigDecimal;
 import java.util.List;
 
+import static com.aquarius.crypto.constants.ConstStrings.BTC_PAIR;
+import static com.aquarius.crypto.constants.ConstStrings.ETH_PAIR;
 import static com.aquarius.crypto.helper.TestDataCreator.createTicker;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -33,6 +36,8 @@ class PriceAggregationServiceTest {
     private MarketTickerProvider huobiProvider;
     @Mock
     private PriceAggregationRepository repository;
+    @Mock
+    private SecurityContextService securityContextService;
 
     @Captor
     private ArgumentCaptor<List<PriceAggregation>> pricesCaptor;
@@ -43,7 +48,7 @@ class PriceAggregationServiceTest {
     void setUp() {
         service = new PriceAggregationService(
                 List.of(binanceProvider, huobiProvider),
-                repository
+                repository, securityContextService
         );
     }
 
@@ -51,10 +56,10 @@ class PriceAggregationServiceTest {
     void testAggregatePrices_SuccessfulAggregation() {
         // GIVEN: Binance has better Bid (Buy), Huobi has better Ask (Sell)
         when(binanceProvider.fetchTickers(any())).thenReturn(Flux.just(
-                createTicker("BINANCE", "ETHUSDT", "2000.00", "2010.00") // High Bid
+                createTicker("BINANCE", ETH_PAIR, "2000.00", "2010.00") // High Bid
         ));
         when(huobiProvider.fetchTickers(any())).thenReturn(Flux.just(
-                createTicker("HUOBI", "ETHUSDT", "1990.00", "2005.00")   // Low Ask
+                createTicker("HUOBI", ETH_PAIR, "1990.00", "2005.00")   // Low Ask
         ));
 
         // WHEN
@@ -67,7 +72,7 @@ class PriceAggregationServiceTest {
         assertEquals(1, savedPrices.size());
         PriceAggregation ethPrice = savedPrices.get(0);
 
-        assertEquals("ETHUSDT", ethPrice.getTradingPair());
+        assertEquals(ETH_PAIR, ethPrice.getTradingPair());
         assertEquals(new BigDecimal("2000.00"), ethPrice.getBestBidPrice(), "Should take Binance Bid");
         assertEquals(new BigDecimal("2005.00"), ethPrice.getBestAskPrice(), "Should take Huobi Ask");
 
@@ -84,7 +89,7 @@ class PriceAggregationServiceTest {
         when(binanceProvider.fetchTickers(any())).thenReturn(Flux.empty());
 
         when(huobiProvider.fetchTickers(any())).thenReturn(Flux.just(
-                createTicker("HUOBI", "ETHUSDT", "1995.00", "2005.00")
+                createTicker("HUOBI", ETH_PAIR, "1995.00", "2005.00")
         ));
 
         // WHEN
@@ -105,10 +110,10 @@ class PriceAggregationServiceTest {
     void testAggregatePrices_TieBreaker() {
         // GIVEN: Both have exact same prices
         when(binanceProvider.fetchTickers(any())).thenReturn(Flux.just(
-                createTicker("BINANCE", "BTCUSDT", "50000.00", "50100.00")
+                createTicker("BINANCE", BTC_PAIR, "50000.00", "50100.00")
         ));
         when(huobiProvider.fetchTickers(any())).thenReturn(Flux.just(
-                createTicker("HUOBI", "BTCUSDT", "50000.00", "50100.00")
+                createTicker("HUOBI", BTC_PAIR, "50000.00", "50100.00")
         ));
 
         // WHEN

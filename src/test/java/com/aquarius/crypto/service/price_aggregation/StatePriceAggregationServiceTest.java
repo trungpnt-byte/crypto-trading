@@ -18,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 
+import static com.aquarius.crypto.constants.ConstStrings.ETH_PAIR;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 import static org.junit.jupiter.api.Assertions.*;
@@ -26,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class StatePriceAggregationServiceTest {
 
     private static final long TEST_STALE_THRESHOLD_SECONDS = 10;
-    private static final String SYMBOL = "ETHUSDT";
+    private static final String SYMBOL = ETH_PAIR;
     private static final BigDecimal ASK_PRICE = new BigDecimal("3000.50");
     private static final BigDecimal BID_PRICE = new BigDecimal("3000.00");
     @Mock

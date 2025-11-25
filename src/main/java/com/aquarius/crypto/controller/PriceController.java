@@ -1,10 +1,8 @@
 package com.aquarius.crypto.controller;
 
 import com.aquarius.crypto.common.LocalApiResponse;
-import com.aquarius.crypto.config.tenant.TenantContext;
 import com.aquarius.crypto.dto.response.AggregatedPriceResponse;
 import com.aquarius.crypto.service.PriceAggregationService;
-import com.aquarius.crypto.service.SecurityContextService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,11 +18,11 @@ public class PriceController {
     private final PriceAggregationService priceService;
 
     @PreAuthorize("hasRole('TRADER')")
-    @GetMapping("/prices/{trading-pair}")
+    @GetMapping("/prices/{symbol}/latest")
     public Mono<ResponseEntity<LocalApiResponse<AggregatedPriceResponse>>> getLatestPrice(
-            @PathVariable String tradingPair) {
+            @PathVariable("symbol") String tradingPair) {
 
-        return priceService.findByTradingPair(tradingPair)
+        return priceService.findLatestByTradingPair(tradingPair)
                 .map(aggregatedPriceResponse -> ResponseEntity.ok(
                         LocalApiResponse.success(
                                 aggregatedPriceResponse,

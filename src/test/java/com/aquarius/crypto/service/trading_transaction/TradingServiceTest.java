@@ -17,6 +17,7 @@ import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 
+import static com.aquarius.crypto.constants.ConstStrings.ETH_PAIR;
 import static com.aquarius.crypto.helper.TestDataCreator.createWallet;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -57,12 +58,12 @@ class TradingServiceTest {
     @Test
     void testBuyExecution_CorrectlyDebitsQuoteAndCreditsBase() {
         // GIVEN: buy 1.0 ETH at 2000 USDT
-        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
+        TradingRequest req = new TradingRequest(1L, ETH_PAIR, "BUY", new BigDecimal("1.0"));
 
         Wallet usdtWallet = createWallet(10L, "USDT", "5000.00");
         Wallet ethWallet = createWallet(20L, "ETH", "0.00");
 
-        when(priceService.bestPrice("ETHUSDT", "BUY")).thenReturn(Mono.just(new BigDecimal("2000.00")));
+        when(priceService.bestPrice(ETH_PAIR, "BUY")).thenReturn(Mono.just(new BigDecimal("2000.00")));
         when(walletService.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(usdtWallet));
         when(walletService.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(ethWallet));
         when(walletService.save(any(Wallet.class))).thenAnswer(i -> Mono.just(i.getArgument(0)));
@@ -90,12 +91,12 @@ class TradingServiceTest {
     void testSellExecution_CorrectlyDebitsBaseAndCreditsQuote() {
         // GIVEN: User wants to SELL 0.5 ETH at 3000 USDT
         // Cost Logic: 0.5 ETH * 3000 = 1500 USDT Value
-        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "SELL", new BigDecimal("0.5"));
+        TradingRequest req = new TradingRequest(1L, ETH_PAIR, "SELL", new BigDecimal("0.5"));
 
         Wallet usdtWallet = createWallet(10L, "USDT", "1000.00");
         Wallet ethWallet = createWallet(20L, "ETH", "2.00");
 
-        when(priceService.bestPrice("ETHUSDT", "SELL")).thenReturn(Mono.just(new BigDecimal("3000.00")));
+        when(priceService.bestPrice(ETH_PAIR, "SELL")).thenReturn(Mono.just(new BigDecimal("3000.00")));
         when(walletService.findByUserAndCurrency(1L, "USDT")).thenReturn(Mono.just(usdtWallet));
         when(walletService.findByUserAndCurrency(1L, "ETH")).thenReturn(Mono.just(ethWallet));
         when(walletService.save(any(Wallet.class))).thenAnswer(i -> Mono.just(i.getArgument(0)));
@@ -122,7 +123,7 @@ class TradingServiceTest {
     @Test
     void testDeadlockPrevention_SavesLowerIdFirst() {
         // GIVEN
-        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
+        TradingRequest req = new TradingRequest(1L, ETH_PAIR, "BUY", new BigDecimal("1.0"));
         // ID 200 (USDT) vs ID 100 (ETH)
         // save ETH (100) first because 100 < 200.
         Wallet highIdWallet = createWallet(200L, "USDT", "5000.00");
@@ -146,7 +147,7 @@ class TradingServiceTest {
 
     @Test
     void testInsufficientBalance_ThrowsError() {
-        TradingRequest req = new TradingRequest(1L, "ETHUSDT", "BUY", new BigDecimal("1.0"));
+        TradingRequest req = new TradingRequest(1L, ETH_PAIR, "BUY", new BigDecimal("1.0"));
         Wallet poorWallet = createWallet(1L, "USDT", "10.00"); // Only have 10
         Wallet ethWallet = createWallet(2L, "ETH", "0.00");
 
