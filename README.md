@@ -79,8 +79,8 @@ This service enables:
 ## Requirements
 
 - **JDK 21**
-- **Gradle 8.x** (wrapper included)
-- Running SQL database (PostgreSQL recommended)
+- **Gradle 8.x**
+- Running SQL database (PostgreSQL recommended) by container with docker-compose setup
 - macOS / Linux / Windows for development
 - Optional: Docker for containerized setup
 
