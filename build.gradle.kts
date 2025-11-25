@@ -51,7 +51,6 @@ dependencies {
     testImplementation("org.testcontainers:postgresql:$testcontainersVersion")
     testImplementation("org.testcontainers:r2dbc:$testcontainersVersion")
     testImplementation("org.mockito:mockito-junit-jupiter")
-    testImplementation("com.google.caliper:caliper:0.5-rc1")
 }
 
 tasks.withType<KotlinCompile> {
@@ -62,9 +61,9 @@ tasks.withType<KotlinCompile> {
 }
 
 tasks.withType<Test> {
-//    javaLauncher.set(javaToolchains.launcherFor {
-//        languageVersion.set(JavaLanguageVersion.of(21))
-//    })
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    })
     maxParallelForks = (Runtime.getRuntime().availableProcessors() / 2).coerceAtLeast(1)
     useJUnitPlatform()
 }
